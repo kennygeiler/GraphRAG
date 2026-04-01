@@ -1,0 +1,22 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Dashboard: New → Blueprint → connect this repo → set secret env vars when prompted.
+
+services:
+  - type: web
+    name: narrative-mri
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # Free tier spins down; use starter for always-on demos.
+    plan: free
+    healthCheckPath: /_stcore/health
+    envVars:
+      - key: DISABLE_PIPELINE_ENGINE
+        value: "1"
+      - key: NEO4J_URI
+        sync: false
+      - key: NEO4J_USER
+        sync: false
+      - key: NEO4J_PASSWORD
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

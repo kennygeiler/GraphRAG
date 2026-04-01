@@ -1,0 +1,29 @@
+# VCS and secrets
+.git
+.gitignore
+.env
+
+# Python / tooling
+.venv
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.cursor
+
+# OS
+.DS_Store
+
+# Large or machine-local artifacts (mount at runtime if needed)
+graph_qa_dump.json
+data_health_report.json
+failed_scenes.log
+
+# Optional: keep image slim for cloud; bind-mount repo for full pipeline locally
+# validated_graph.json
+# raw_scenes.json
+# master_lexicon.json
+# pipeline_state.json
+# target_script.fdx

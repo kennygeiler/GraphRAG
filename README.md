@@ -1,93 +1,219 @@
-# Narrative MRI
+```
+  _ __   ___ _ __ _ __ ___  ___  _ __ ___
+ | '_ \ / _ \ '__| '__/ _ \/ _ \| '_ ` _ \
+ | | | |  __/ |  | | |  __/ (_) | | | | | |
+ |_| |_|\___|_|  |_|  \___|\___/|_| |_| |_|
 
-> Stop guessing if your script works. Measure its physics.
-
-**Narrative MRI** is a GraphRAG-style pipeline for screenplays: Final Draft → validated JSON → **Neo4j** → a **Streamlit** dashboard. It surfaces structural signals—**pacing (momentum)**, **character agency over acts**, and **long-horizon props**—with evidence on edges as verbatim **`source_quote`** text.
-
-**Authoritative detail:** [`strategy.md`](strategy.md) (architecture, metric definitions, AI rules). **Compact snapshot:** [`MEMORY.md`](MEMORY.md). **For coding agents:** [`AGENTS.md`](AGENTS.md).
-
-**Remote:** [github.com/kennygeiler/GraphRAG](https://github.com/kennygeiler/GraphRAG) (private by default—adjust visibility in GitHub settings if you open-source it).
-
-## Philosophy
-
-Coverage is often subjective. Here, a screenplay is modeled as **typed relationships** among characters, locations, and props per scene. Metrics are reproducible from the graph, not from vibes alone.
-
-## Stack
-
-| Layer | Choice |
-|--------|--------|
-| Extraction | Claude via [`instructor`](https://github.com/jxnl/instructor) + Pydantic (`schema.py`) |
-| Graph | [Neo4j](https://neo4j.com/) |
-| Runtime | Python 3.12 + [`uv`](https://github.com/astral-sh/uv) |
-| UI | [Streamlit](https://streamlit.io/) + [Plotly](https://plotly.com/python/) |
-
-## Dashboard: Narrative Timeline Analyzer (`app.py`)
-
-Wide-layout Streamlit app. Main analytics live under **Narrative Timeline**:
-
-1. **Narrative momentum** — Per-scene **heat** = in-scene `CONFLICTS_WITH / (INTERACTS_WITH + CONFLICTS_WITH)` among co-present entities; **3-scene rolling average**; area fill; dashed markers at **Act 2 / Act 3** starts (derived from Neo4j).
-2. **The Payoff Matrix (Long-Term Plot Devices)** — Props whose first on-screen intro and last narrative use are separated by more than **10** scene numbers (filters short-loop noise).
-3. **Power shift** — **Passivity index** (in-degree / total degree on `CONFLICTS_WITH` + `USES`, windowed by act) for the **top five** characters by interaction volume. **Act boundaries** are **equal thirds** of the `min..max(:Event.number)` span in the database (script-agnostic). **`st.warning`** if the protagonist (**Zev**, configurable in code) has **higher** passivity in Act 3 than in Act 1.
-
-Other tabs: **Human-in-the-Loop** (`hitl.py`), **Ask the graph** (`agent.py`), **Pipeline Engine** (nuke / upload `.fdx` / staged `uv run` pipeline).
-
-## Prerequisites
-
-- `uv` — `uv sync` installs from `pyproject.toml` / `uv.lock` (`requirements.txt` is ancillary).
-- Running **Neo4j**
-- **Anthropic** API key (ingest)
-
-Copy **`.env.example`** → **`.env`** and fill in secrets. **Never commit `.env`.**
-
-```env
-ANTHROPIC_API_KEY=sk-ant-...
-NEO4J_URI=neo4j://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=...
+           screenplay structure you can measure.
 ```
 
-Optional (tracing / QA): `LANGCHAIN_*` variables as in `.env.example`.
+> final draft → validated graph → neo4j → streamlit. pacing, agency, and long-horizon props—with **verbatim quotes** on every narrative edge. built for writers who want **physics**, not vibes.
 
-## Usage
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![Neo4j](https://img.shields.io/badge/Neo4j-graph-008cc1.svg)](https://neo4j.com/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-app-FF4B4B.svg)](https://streamlit.io/)
+[![uv](https://img.shields.io/badge/uv-astral-915C83.svg)](https://github.com/astral-sh/uv)
+[![Claude](https://img.shields.io/badge/extract-Claude%20%2B%20Instructor-D4A574.svg)](https://github.com/jxnl/instructor)
+
+## the problem
+
+coverage is subjective. “does act two drag?” “is my protagonist reactive?” “did we forget the gun?” you get opinions. you don’t get **reproducible** answers tied to the actual script.
+
+**narrative mri** turns a screenplay into a **queryable graph**: who conflicts with whom, in which scene, with **proof text** on the relationship. from that graph you compute **momentum** (rolling friction), **passivity by act**, and **long-arc props**—and you can **human-in-the-loop** verify scenes before you trust the metrics.
+
+full detail lives in [`strategy.md`](strategy.md). quick context: [`MEMORY.md`](MEMORY.md). agents: [`AGENTS.md`](AGENTS.md).
+
+## table of contents
+
+- [how it works](#how-it-works)
+- [the pipeline](#the-pipeline)
+- [dashboard](#dashboard)
+- [quick start](#quick-start)
+- [environment variables](#environment-variables)
+- [deployment](#deployment)
+- [project structure](#project-structure)
+- [license](#license)
+
+## how it works
+
+### the flow (real modules, not a toy diagram)
+
+| step | module | what happens |
+|------|--------|----------------|
+| **parse** | `parser.py` | `.fdx` xml → `raw_scenes.json`. **no llm.** |
+| **lexicon** | `lexicon.py` | whole script text → claude + pydantic → `master_lexicon.json` (stable `snake_case` ids). |
+| **ingest** | `ingest.py` + `schema.py` | **per scene**: claude + **instructor** → `SceneGraph`; edges need `source_id`, `target_id`, `type`, **`source_quote`**. |
+| **load** | `neo4j_loader.py` | merge `:Character` `:Location` `:Prop` `:Event`, `IN_SCENE`, narrative rels. |
+| **analyze** | `metrics.py` | parameterized cypher → momentum, payoff props, passivity windows, etc. |
+| **ui** | `app.py` | streamlit + plotly. optional: `agent.py` (ask the graph). |
+
+neo4j does **not** read english. it stores **nodes and edges**. streamlit asks **metrics**; metrics ask **cypher**.
+
+### the pipeline
+
+```
+  FDX              PARSER              RAW JSON
+   │                  │                    │
+   │  screenplay.xml │                    │
+   └─────────────────▶│  ElementTree       │
+                      │  scenes + text     │
+                      └─────────┬──────────┘
+                                │
+                                ▼
+                      ┌─────────────────┐
+                      │  LEXICON        │◀── claude + pydantic
+                      │  (all scenes)   │     master cast/locs
+                      └────────┬────────┘
+                               │
+                               ▼
+                      ┌─────────────────┐
+                      │  INGEST         │◀── claude + instructor
+                      │  (per scene)    │     SceneGraph + quotes
+                      └────────┬────────┘
+                               │
+                               ▼
+               validated_graph.json (checkpointed)
+                               │
+                               ▼
+                      ┌─────────────────┐
+                      │  NEO4J LOADER   │
+                      │  MERGE graph    │
+                      └────────┬────────┘
+                               │
+                               ▼
+                      ┌─────────────────┐
+                      │  NEO4J          │
+                      │  bolt / aura    │
+                      └────────┬────────┘
+                               │
+                               ▼
+                      ┌─────────────────┐
+                      │  STREAMLIT      │
+                      │  metrics.py     │
+                      └─────────────────┘
+```
+
+**important corrections** vs a lazy “ai tags the script” story:
+
+- **`parser.py` never calls an api.** only **`lexicon.py`** and **`ingest.py`** (and **`agent.py`** for chat) use the model.
+- pydantic + instructor **enforce** edge shape; bad structured output **retries or fails**—it doesn’t silently save junk.
+
+## dashboard
+
+wide-layout streamlit. main analytics: **narrative timeline**.
+
+| chart | what it is |
+|-------|------------|
+| **narrative momentum** | per-scene heat = `CONFLICTS_WITH / (INTERACTS_WITH + CONFLICTS_WITH)` among co-present entities; **3-scene rolling mean**; shaded area; dashed act boundaries from **equal thirds** of `min..max(:Event.number)` in the db. |
+| **payoff matrix** | long-horizon props: first intro vs last `USES` / `CONFLICTS_WITH` separated by **> 10** scene numbers (drops noise). |
+| **power shift** | passivity index (in / total on `CONFLICTS_WITH` + `USES` in act windows) for **top 5** characters by interaction volume. **`st.warning`** if configured protagonist (**`zev`** in code) is **more** passive in act 3 than act 1. |
+
+other tabs: **human-in-the-loop** (`hitl.py`), **ask the graph** (`agent.py`), **pipeline engine** (local `uv` chain—hidden in cloud when `DISABLE_PIPELINE_ENGINE=1`).
+
+## quick start
+
+### five minutes: cold run
 
 ```bash
+git clone https://github.com/kennygeiler/GraphRAG.git
+cd GraphRAG
 uv sync
+cp .env.example .env
+# fill ANTHROPIC_API_KEY + NEO4J_* (local desktop, docker, or aura)
 
-# 1) Parse Final Draft → raw_scenes.json
-uv run python parser.py screenplay.fdx
-
-# 2) Master lexicon from raw scenes
+uv run python parser.py path/to/script.fdx
 uv run python lexicon.py raw_scenes.json
-
-# 3) Per-scene LLM extract → validated_graph.json (checkpointed; re-run to resume)
 uv run python ingest.py
-
-# 4) Load Neo4j from validated_graph.json
 uv run python neo4j_loader.py
-
-# 5) Dashboard
 uv run streamlit run app.py
 ```
 
-**Optional CLI** (`metrics.py`, `reconcile.py`) — see `strategy.md` §4 and `--help` on each script.
+open **http://localhost:8501**. ingest **checkpoints**; re-run or `ingest.py --resume` if it stops mid-script.
 
-## Project layout
+### optional cli
 
-| Path | Role |
-|------|------|
-| `parser.py` | `.fdx` → `raw_scenes.json` |
-| `lexicon.py` | `master_lexicon.json` / `lexicon.json` |
-| `ingest.py` | Scene graphs → `validated_graph.json` |
-| `neo4j_loader.py` | JSON → Neo4j |
-| `metrics.py` | Cypher analytics (momentum, payoff props, passivity, heat, etc.) |
-| `app.py` | Streamlit application |
-| `hitl.py` | Draft vs Gold scene review |
-| `agent.py` | LangChain Cypher QA |
-| `schema.py` | Pydantic graph contract |
-| `strategy.md` | Full project brain |
-| `MEMORY.md` | Short memory snapshot |
-| `AGENTS.md` | Instructions for AI assistants |
+```bash
+uv run python metrics.py --help
+uv run python reconcile.py --dry-run
+```
 
-## License
+## environment variables
 
-Add a license (e.g. MIT) when you publish the repo.
+copy [`.env.example`](.env.example) → `.env`. **never commit `.env`.**
+
+```env
+ANTHROPIC_API_KEY=sk-ant-...
+NEO4J_URI=neo4j://localhost:7687    # or neo4j+s://… for aura
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=...
+
+# hosted / docker: hide pipeline tab (subprocess + disk)
+# DISABLE_PIPELINE_ENGINE=1
+
+# optional: langsmith
+# LANGCHAIN_API_KEY=...
+# LANGCHAIN_TRACING_V2=false
+```
+
+## deployment
+
+there is **no** single button that provisions **both** neo4j aura and the app. aura is always a short separate signup. after that, the repo is set up for **docker** + **render blueprint**.
+
+### fastest cloud shape
+
+| step | action |
+|------|--------|
+| 1 | create [neo4j aura](https://neo4j.com/cloud/) → copy bolt uri + password. |
+| 2 | from a machine with `validated_graph.json`: point `.env` at aura → `uv run python neo4j_loader.py`. |
+| 3 | push repo → [render](https://dashboard.render.com) **new → blueprint** → select repo → [`render.yaml`](render.yaml) → set secret `NEO4J_*` (+ optional `ANTHROPIC_API_KEY`). |
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+### docker (local or any host)
+
+```bash
+docker build -t narrative-mri .
+docker run --rm -p 8501:8501 --env-file .env -e DISABLE_PIPELINE_ENGINE=1 narrative-mri
+```
+
+`Dockerfile` respects **`PORT`** for render/fly/railway.
+
+### one machine: neo4j + app
+
+```bash
+printf '%s\n' 'NEO4J_PASSWORD=your-secure-password' > .env
+docker compose -f docker-compose.stack.yml up --build -d
+NEO4J_URI=bolt://localhost:7687 NEO4J_USER=neo4j NEO4J_PASSWORD='your-secure-password' uv run python neo4j_loader.py
+```
+
+### reviewer handoff
+
+- **url only:** deploy dashboard against a pre-loaded aura; share https link.
+- **private git:** invite + `.env.example` → `.env` + `uv sync` + `streamlit run app.py`.
+- screenplay / json may be sensitive—keep repos private and align with your nda.
+
+## project structure
+
+```
+GraphRAG/
+├── parser.py              # .fdx → raw_scenes.json (xml only)
+├── lexicon.py             # claude → master_lexicon.json
+├── ingest.py              # per-scene SceneGraph → validated_graph.json
+├── neo4j_loader.py        # json → neo4j
+├── schema.py              # pydantic graph contract
+├── metrics.py             # cypher analytics
+├── app.py                 # streamlit + plotly
+├── hitl.py                # draft vs gold scene review
+├── agent.py               # nl → cypher (optional)
+├── Dockerfile
+├── docker-compose.yml     # app → external neo4j / aura
+├── docker-compose.stack.yml   # neo4j + app on one host
+├── render.yaml            # render blueprint
+├── strategy.md            # authoritative project brain
+├── MEMORY.md
+└── AGENTS.md
+```
+
+## license
+
+add a license (e.g. mit) when you publish the repo.

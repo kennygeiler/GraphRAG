@@ -1,0 +1,48 @@
+# One-command stack: Neo4j 5 + Streamlit (no Aura). Use on a laptop or a VPS with Docker.
+#
+#   echo 'NEO4J_PASSWORD=choose-a-strong-password' > .env
+#   echo 'ANTHROPIC_API_KEY=...' >> .env   # optional, for Ask the graph
+#   docker compose -f docker-compose.stack.yml up --build -d
+#
+# Then load the graph from the host (Neo4j Bolt on localhost:7687):
+#   NEO4J_URI=bolt://localhost:7687 NEO4J_USER=neo4j NEO4J_PASSWORD='...' uv run python neo4j_loader.py
+#
+# Browse: http://localhost:8501 (app) and http://localhost:7474 (Neo4j Browser).
+
+services:
+  neo4j:
+    image: neo4j:5-community
+    restart: unless-stopped
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env}
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD}", "RETURN 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 45s
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      PORT: "8501"
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      DISABLE_PIPELINE_ENGINE: "1"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+
+volumes:
+  neo4j_data:

@@ -31,6 +31,14 @@ PAYOFF_MIN_SCENE_GAP = 10
 TOP_INTERACTION_CHARACTERS = 5
 PROTAGONIST_ID = "zev"
 
+
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+# Hosted / Docker: set DISABLE_PIPELINE_ENGINE=1 — subprocess pipeline + disk writes are unsafe on typical PaaS.
+_PIPELINE_ENGINE_ENABLED = not _env_truthy("DISABLE_PIPELINE_ENGINE")
+
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _PIPELINE_JSON_NAMES = (
     "raw_scenes.json",
@@ -410,16 +418,28 @@ with st.sidebar:
         st.cache_data.clear()
         st.session_state["_engine_room_flash"] = "Cache cleared — re-querying Neo4j."
         st.rerun()
-    st.caption("Charts read **Neo4j** only. Run **neo4j_loader** after ingest.")
+    if _PIPELINE_ENGINE_ENABLED:
+        st.caption("Charts read **Neo4j** only. Run **neo4j_loader** after ingest.")
+    else:
+        st.caption(
+            "Charts read **Neo4j** only. **Pipeline Engine** is disabled on this host — "
+            "run parser / ingest / **neo4j_loader** locally (or on a VM), then open this app."
+        )
 
-tab_timeline, tab_hitl, tab_chat, tab_engine = st.tabs(
-    [
-        "Narrative Timeline",
-        "Human-in-the-Loop validation",
-        "Ask the graph",
-        "⚙️ Pipeline Engine",
-    ]
-)
+_tab_labels = [
+    "Narrative Timeline",
+    "Human-in-the-Loop validation",
+    "Ask the graph",
+]
+if _PIPELINE_ENGINE_ENABLED:
+    _tab_labels.append("⚙️ Pipeline Engine")
+
+_tabs = st.tabs(_tab_labels)
+tab_timeline = _tabs[0]
+tab_hitl = _tabs[1]
+tab_chat = _tabs[2]
+if _PIPELINE_ENGINE_ENABLED:
+    tab_engine = _tabs[3]
 
 with tab_timeline:
     _render_momentum_chart(momentum_rows, _act_bounds)
@@ -591,164 +611,165 @@ with tab_chat:
             st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
 
-with tab_engine:
-    st.header("⚙️ Pipeline Engine")
-    st.caption(
-        "Linear four-stage chain only (repo root as cwd). **Launch** runs, in order:\n\n"
-        "1. `uv run python parser.py target_script.fdx`\n"
-        "2. `uv run python lexicon.py raw_scenes.json`\n"
-        "3. `uv run python ingest.py`\n"
-        "4. `uv run python neo4j_loader.py`\n\n"
-        "**Timeline charts read Neo4j**, not `validated_graph.json` directly. "
-        "After ingest, complete **stage 4** (or use **Reload metrics from Neo4j** in the sidebar)."
-    )
-
-    st.subheader("Clean slate")
-    st.markdown(
-        '<p style="color:#dc2626;font-weight:700;font-size:1.05rem;margin-bottom:0.35rem;">'
-        "⚠️ NUKE DATABASE & CACHE"
-        "</p>",
-        unsafe_allow_html=True,
-    )
-    st.caption(
-        "Runs `MATCH (n) DETACH DELETE n` on Neo4j and removes pipeline JSON outputs from disk."
-    )
-    if st.button(
-        "⚠️ NUKE DATABASE & CACHE",
-        key="pipeline_nuke",
-        help="Irreversible: empties Neo4j and deletes raw_scenes.json, master_lexicon.json, validated_graph.json, pipeline_state.json.",
-    ):
-        try:
-            _nuke_neo4j_all_nodes()
-            _delete_pipeline_json_files()
-        except Exception as exc:
-            st.error(f"Wipe failed: {exc}")
-        else:
-            st.session_state["_engine_room_flash"] = "Slate wiped — Neo4j and pipeline JSON cleared."
-            st.cache_data.clear()
-            st.rerun()
-
-    st.divider()
-    st.subheader("Uploader")
-    _up = st.file_uploader(
-        "Final Draft screenplay",
-        type=["fdx"],
-        help="Stored in the project directory as target_script.fdx (overwrites any previous file).",
-        key="pipeline_fdx_upload",
-    )
-    if _up is not None:
-        _TARGET_FDX.write_bytes(_up.getvalue())
-        st.success(
-            f"Saved **{_TARGET_FDX.name}** ({len(_up.getvalue()):,} bytes). "
-            "Use **Launch Extraction Pipeline** below."
-        )
-
-    st.divider()
-    st.subheader("Pipeline status")
-    _snap = filesystem_snapshot(_PROJECT_ROOT)
-    with st.expander("What’s on disk (artifacts + last known ingest/loader)", expanded=False):
+if _PIPELINE_ENGINE_ENABLED:
+    with tab_engine:
+        st.header("⚙️ Pipeline Engine")
         st.caption(
-            "**Ingest progress** = rows in `validated_graph.json` vs scenes in `raw_scenes.json`. "
-            "`ingest.py` checkpoints after **each** successful scene unless you pass `--no-checkpoint`."
-        )
-        st.json(_snap)
-
-    _raw_ok = bool(_snap.get("parser") and _snap["parser"].get("ok"))
-    _lex_ok = bool(_snap.get("lexicon") and _snap["lexicon"].get("ok"))
-    _ing = _snap.get("ingest") or {}
-    _ing_ok = bool(_ing.get("ok"))
-    _missing_ingest = int(_ing.get("missing_count") or 0) if _ing_ok else 0
-    if _raw_ok and _lex_ok and _ing_ok and _missing_ingest > 0:
-        st.warning(
-            f"Ingest is **partial**: **{_ing.get('entries_in_file', 0)}** scene graph(s) on disk, "
-            f"**{_missing_ingest}** scene number(s) still missing (see `failed_scenes.log`). "
-            "Use **Resume ingest** below to continue without re-parsing."
+            "Linear four-stage chain only (repo root as cwd). **Launch** runs, in order:\n\n"
+            "1. `uv run python parser.py target_script.fdx`\n"
+            "2. `uv run python lexicon.py raw_scenes.json`\n"
+            "3. `uv run python ingest.py`\n"
+            "4. `uv run python neo4j_loader.py`\n\n"
+            "**Timeline charts read Neo4j**, not `validated_graph.json` directly. "
+            "After ingest, complete **stage 4** (or use **Reload metrics from Neo4j** in the sidebar)."
         )
 
-    st.divider()
-    st.subheader("Execution chain")
-
-    if not _TARGET_FDX.is_file():
-        st.info("Upload a **.fdx** file above so **target_script.fdx** exists before launching.")
-
-    _stages: list[tuple[str, list[str]]] = [
-        ("Stage 1 — Parser (`raw_scenes.json`)", ["parser.py", "target_script.fdx"]),
-        ("Stage 2 — Lexicon (`master_lexicon.json`)", ["lexicon.py", "raw_scenes.json"]),
-        ("Stage 3 — Ingest (`validated_graph.json`)", ["ingest.py"]),
-        ("Stage 4 — Neo4j loader", ["neo4j_loader.py"]),
-    ]
-
-    if st.button(
-        "Resume ingest only (`ingest.py --resume`)",
-        key="pipeline_resume_ingest",
-        help="Keeps existing `validated_graph.json` rows (by scene_number) and only calls the LLM for missing scenes. Requires raw_scenes.json + master_lexicon.json.",
-        disabled=not (_raw_ok and _lex_ok),
-    ):
-        _log_r: list[str] = []
-        _ph_r = st.empty()
-        _banner_r = (
-            "\n" + "=" * 72 + "\nResume — Stage 3 Ingest (partial)\n" + "=" * 72 + "\n"
-            "$ uv run python ingest.py --resume\n\n"
+        st.subheader("Clean slate")
+        st.markdown(
+            '<p style="color:#dc2626;font-weight:700;font-size:1.05rem;margin-bottom:0.35rem;">'
+            "⚠️ NUKE DATABASE & CACHE"
+            "</p>",
+            unsafe_allow_html=True,
         )
-        _rc_r = _run_uv_pipeline_stage(
-            ["ingest.py", "--resume"],
-            log_chunks=_log_r,
-            log_placeholder=_ph_r,
-            stage_banner=_banner_r,
+        st.caption(
+            "Runs `MATCH (n) DETACH DELETE n` on Neo4j and removes pipeline JSON outputs from disk."
         )
-        if _rc_r != 0:
-            st.error(f"Resume ingest exited with code **{_rc_r}**.")
-            _ph_r.code("".join(_log_r), language="text")
-        else:
-            st.session_state["_engine_room_flash"] = "Ingest updated — refreshing dashboard cache."
-            st.cache_data.clear()
-            st.rerun()
+        if st.button(
+            "⚠️ NUKE DATABASE & CACHE",
+            key="pipeline_nuke",
+            help="Irreversible: empties Neo4j and deletes raw_scenes.json, master_lexicon.json, validated_graph.json, pipeline_state.json.",
+        ):
+            try:
+                _nuke_neo4j_all_nodes()
+                _delete_pipeline_json_files()
+            except Exception as exc:
+                st.error(f"Wipe failed: {exc}")
+            else:
+                st.session_state["_engine_room_flash"] = "Slate wiped — Neo4j and pipeline JSON cleared."
+                st.cache_data.clear()
+                st.rerun()
 
-    if st.button(
-        "Launch Extraction Pipeline",
-        type="primary",
-        key="pipeline_launch",
-        disabled=not _TARGET_FDX.is_file(),
-    ):
-        _log_chunks: list[str] = []
-        _log_ph = st.empty()
-        _failed = False
-        _fail_rc = 0
-        _fail_label = ""
+        st.divider()
+        st.subheader("Uploader")
+        _up = st.file_uploader(
+            "Final Draft screenplay",
+            type=["fdx"],
+            help="Stored in the project directory as target_script.fdx (overwrites any previous file).",
+            key="pipeline_fdx_upload",
+        )
+        if _up is not None:
+            _TARGET_FDX.write_bytes(_up.getvalue())
+            st.success(
+                f"Saved **{_TARGET_FDX.name}** ({len(_up.getvalue()):,} bytes). "
+                "Use **Launch Extraction Pipeline** below."
+            )
 
-        with st.status("Extraction pipeline", expanded=True) as _pipe_status:
-            _prog = st.progress(0, text="Starting…")
-            for _i, (_label, _args) in enumerate(_stages):
-                _pipe_status.update(label=f"{_label}…", state="running")
-                _prog.progress(_i / len(_stages), text=_label)
-                _banner = f"\n{'=' * 72}\n{_label}\n{'=' * 72}\n$ uv run python {' '.join(_args)}\n\n"
-                _rc = _run_uv_pipeline_stage(
-                    _args,
-                    log_chunks=_log_chunks,
-                    log_placeholder=_log_ph,
-                    stage_banner=_banner,
+        st.divider()
+        st.subheader("Pipeline status")
+        _snap = filesystem_snapshot(_PROJECT_ROOT)
+        with st.expander("What’s on disk (artifacts + last known ingest/loader)", expanded=False):
+            st.caption(
+                "**Ingest progress** = rows in `validated_graph.json` vs scenes in `raw_scenes.json`. "
+                "`ingest.py` checkpoints after **each** successful scene unless you pass `--no-checkpoint`."
+            )
+            st.json(_snap)
+
+        _raw_ok = bool(_snap.get("parser") and _snap["parser"].get("ok"))
+        _lex_ok = bool(_snap.get("lexicon") and _snap["lexicon"].get("ok"))
+        _ing = _snap.get("ingest") or {}
+        _ing_ok = bool(_ing.get("ok"))
+        _missing_ingest = int(_ing.get("missing_count") or 0) if _ing_ok else 0
+        if _raw_ok and _lex_ok and _ing_ok and _missing_ingest > 0:
+            st.warning(
+                f"Ingest is **partial**: **{_ing.get('entries_in_file', 0)}** scene graph(s) on disk, "
+                f"**{_missing_ingest}** scene number(s) still missing (see `failed_scenes.log`). "
+                "Use **Resume ingest** below to continue without re-parsing."
+            )
+
+        st.divider()
+        st.subheader("Execution chain")
+
+        if not _TARGET_FDX.is_file():
+            st.info("Upload a **.fdx** file above so **target_script.fdx** exists before launching.")
+
+        _stages: list[tuple[str, list[str]]] = [
+            ("Stage 1 — Parser (`raw_scenes.json`)", ["parser.py", "target_script.fdx"]),
+            ("Stage 2 — Lexicon (`master_lexicon.json`)", ["lexicon.py", "raw_scenes.json"]),
+            ("Stage 3 — Ingest (`validated_graph.json`)", ["ingest.py"]),
+            ("Stage 4 — Neo4j loader", ["neo4j_loader.py"]),
+        ]
+
+        if st.button(
+            "Resume ingest only (`ingest.py --resume`)",
+            key="pipeline_resume_ingest",
+            help="Keeps existing `validated_graph.json` rows (by scene_number) and only calls the LLM for missing scenes. Requires raw_scenes.json + master_lexicon.json.",
+            disabled=not (_raw_ok and _lex_ok),
+        ):
+            _log_r: list[str] = []
+            _ph_r = st.empty()
+            _banner_r = (
+                "\n" + "=" * 72 + "\nResume — Stage 3 Ingest (partial)\n" + "=" * 72 + "\n"
+                "$ uv run python ingest.py --resume\n\n"
+            )
+            _rc_r = _run_uv_pipeline_stage(
+                ["ingest.py", "--resume"],
+                log_chunks=_log_r,
+                log_placeholder=_ph_r,
+                stage_banner=_banner_r,
+            )
+            if _rc_r != 0:
+                st.error(f"Resume ingest exited with code **{_rc_r}**.")
+                _ph_r.code("".join(_log_r), language="text")
+            else:
+                st.session_state["_engine_room_flash"] = "Ingest updated — refreshing dashboard cache."
+                st.cache_data.clear()
+                st.rerun()
+
+        if st.button(
+            "Launch Extraction Pipeline",
+            type="primary",
+            key="pipeline_launch",
+            disabled=not _TARGET_FDX.is_file(),
+        ):
+            _log_chunks: list[str] = []
+            _log_ph = st.empty()
+            _failed = False
+            _fail_rc = 0
+            _fail_label = ""
+
+            with st.status("Extraction pipeline", expanded=True) as _pipe_status:
+                _prog = st.progress(0, text="Starting…")
+                for _i, (_label, _args) in enumerate(_stages):
+                    _pipe_status.update(label=f"{_label}…", state="running")
+                    _prog.progress(_i / len(_stages), text=_label)
+                    _banner = f"\n{'=' * 72}\n{_label}\n{'=' * 72}\n$ uv run python {' '.join(_args)}\n\n"
+                    _rc = _run_uv_pipeline_stage(
+                        _args,
+                        log_chunks=_log_chunks,
+                        log_placeholder=_log_ph,
+                        stage_banner=_banner,
+                    )
+                    if _rc != 0:
+                        _failed = True
+                        _fail_rc = _rc
+                        _fail_label = _label
+                        _pipe_status.update(label=f"Failed: {_label}", state="error")
+                        _prog.progress(1.0, text="Failed")
+                        break
+
+                if not _failed:
+                    _pipe_status.update(label="Pipeline complete", state="complete")
+                    _prog.progress(1.0, text="Done")
+
+            if _failed:
+                st.error(
+                    f"Pipeline halted — **{_fail_label}** exited with code **{_fail_rc}**. "
+                    "See the log above."
                 )
-                if _rc != 0:
-                    _failed = True
-                    _fail_rc = _rc
-                    _fail_label = _label
-                    _pipe_status.update(label=f"Failed: {_label}", state="error")
-                    _prog.progress(1.0, text="Failed")
-                    break
-
-            if not _failed:
-                _pipe_status.update(label="Pipeline complete", state="complete")
-                _prog.progress(1.0, text="Done")
-
-        if _failed:
-            st.error(
-                f"Pipeline halted — **{_fail_label}** exited with code **{_fail_rc}**. "
-                "See the log above."
-            )
-            _log_ph.code("".join(_log_chunks), language="text")
-        else:
-            st.session_state["_engine_room_flash"] = (
-                "Pipeline finished — dashboard reloaded from Neo4j (cache cleared)."
-            )
-            st.cache_data.clear()
-            st.rerun()
+                _log_ph.code("".join(_log_chunks), language="text")
+            else:
+                st.session_state["_engine_room_flash"] = (
+                    "Pipeline finished — dashboard reloaded from Neo4j (cache cleared)."
+                )
+                st.cache_data.clear()
+                st.rerun()
