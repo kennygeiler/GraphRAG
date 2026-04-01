@@ -13,11 +13,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import instructor
-from anthropic import Anthropic, APIStatusError
-from instructor.core.exceptions import InstructorRetryException
+from anthropic import APIStatusError
 from pydantic import ValidationError
 
+from extraction_graph import run_extraction_pipeline
+from extraction_llm import _get_anthropic_client
 from schema import SceneGraph
 
 from pipeline_state import update_ingest_progress
@@ -27,79 +27,16 @@ DEFAULT_RAW_SCENES = _ROOT / "raw_scenes.json"
 DEFAULT_MASTER_LEXICON = _ROOT / "master_lexicon.json"
 DEFAULT_OUTPUT = _ROOT / "validated_graph.json"
 DEFAULT_FAILED_LOG = _ROOT / "failed_scenes.log"
-
-# Legacy IDs like claude-3-sonnet-20240229 return 404 on current API tiers.
-_PRIMARY_MODEL = "claude-sonnet-4-6"
-_FALLBACK_MODEL = "claude-3-haiku-20240307"
-_MAX_TOKENS = 4096
-
-_instructor_client: Any | None = None
+DEFAULT_AUDIT_LOG = _ROOT / "extraction_audit.jsonl"
 
 
-def _get_anthropic_client() -> Any:
-    global _instructor_client
-    if _instructor_client is None:
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if api_key is None:
-            print("❌ Missing ANTHROPIC_API_KEY. Please add it to your .env file.", flush=True)
-            sys.exit(1)
-        _instructor_client = instructor.from_anthropic(Anthropic(api_key=api_key))
-    return _instructor_client
-
-
-def _print_api_status_error(exc: APIStatusError, *, label: str) -> None:
-    detail = f"HTTP {exc.status_code}"
-    if exc.status_code in (400, 404):
-        detail += " (bad request / not found — check model id and payload)"
-    print(f"❌ Anthropic {label}: {detail}", flush=True)
-    print(f"   Message: {exc.message}", flush=True)
-    if getattr(exc, "request_id", None):
-        print(f"   request_id: {exc.request_id}", flush=True)
-    if exc.body is not None:
-        print(f"   Response body: {exc.body}", flush=True)
-
-
-def call_llm(model: str, prompt: str, *, system_prompt: str) -> SceneGraph:
-    """Run one structured-output completion; max_tokens fixed at 4096 for primary and Haiku."""
-    client = _get_anthropic_client()
-    max_tokens = _MAX_TOKENS
-    try:
-        return client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            temperature=0,
-            system=system_prompt,
-            messages=[{"role": "user", "content": prompt}],
-            response_model=SceneGraph,
-            max_retries=1,
-        )
-    except APIStatusError as exc:
-        _print_api_status_error(exc, label=f"API error ({model})")
-        raise
-    except InstructorRetryException as exc:
-        if exc.failed_attempts:
-            inner = exc.failed_attempts[0].exception
-            if isinstance(inner, APIStatusError):
-                _print_api_status_error(inner, label=f"API error ({model})")
-                raise inner from exc
-        print(f"❌ Instructor error ({model}): {exc}", flush=True)
-        raise
-
-
-def _call_extract(system_prompt: str, user_text: str) -> SceneGraph:
-    try:
-        return call_llm(_PRIMARY_MODEL, user_text, system_prompt=system_prompt)
-    except ValidationError:
-        raise
-    except APIStatusError:
-        print("⚠️ Primary model request failed (see error above). Retrying with Haiku...", flush=True)
-        return call_llm(_FALLBACK_MODEL, user_text, system_prompt=system_prompt)
-    except Exception as e:
-        print(
-            f"⚠️ Primary model failed ({type(e).__name__}: {e}). Retrying with Haiku...",
-            flush=True,
-        )
-        return call_llm(_FALLBACK_MODEL, user_text, system_prompt=system_prompt)
+def _append_audit_entries(path: Path, entries: list[dict[str, Any]]) -> None:
+    if not entries:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        for row in entries:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def _format_scene_user_message(scene: dict[str, Any]) -> str:
@@ -244,6 +181,12 @@ def main() -> None:
         help="Append validation errors here (default: ./failed_scenes.log)",
     )
     parser.add_argument(
+        "--audit-log",
+        type=Path,
+        default=DEFAULT_AUDIT_LOG,
+        help="Append LangGraph extract/validator/fixer audit JSON lines (default: ./extraction_audit.jsonl)",
+    )
+    parser.add_argument(
         "--resume",
         action="store_true",
         help="Explicit flag for UI/scripts; partial files are auto-continued even without this.",
@@ -342,7 +285,10 @@ def main() -> None:
                 }
             else:
                 try:
-                    graph = _call_extract(system_prompt, user_text)
+                    graph, audit_entries, pipe_err = run_extraction_pipeline(sn, user_text, system_prompt)
+                    _append_audit_entries(args.audit_log, audit_entries)
+                    if pipe_err:
+                        raise RuntimeError(pipe_err)
                 except ValidationError as exc:
                     _append_failed_log(args.failed_log, i, total, scene, exc)
                 except APIStatusError as exc:
