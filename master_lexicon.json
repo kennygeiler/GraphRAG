@@ -1,0 +1,138 @@
+{
+  "characters": [
+    {
+      "id": "alan",
+      "name": "Alan"
+    },
+    {
+      "id": "charlotte",
+      "name": "Charlotte"
+    },
+    {
+      "id": "connie",
+      "name": "Connie"
+    },
+    {
+      "id": "dakotah",
+      "name": "Dakotah"
+    },
+    {
+      "id": "florence",
+      "name": "Florence"
+    },
+    {
+      "id": "granny_1",
+      "name": "Granny One"
+    },
+    {
+      "id": "granny_2",
+      "name": "Granny Two"
+    },
+    {
+      "id": "jimmy",
+      "name": "Jimmy"
+    },
+    {
+      "id": "mary",
+      "name": "Mary"
+    },
+    {
+      "id": "nathan",
+      "name": "Nathan"
+    },
+    {
+      "id": "richard",
+      "name": "Richard"
+    },
+    {
+      "id": "robert",
+      "name": "Robert"
+    },
+    {
+      "id": "sheryl",
+      "name": "Sheryl"
+    },
+    {
+      "id": "shlomo",
+      "name": "Shlomo"
+    },
+    {
+      "id": "tailor",
+      "name": "Tailor"
+    },
+    {
+      "id": "tatyana",
+      "name": "Tatyana"
+    },
+    {
+      "id": "the_general",
+      "name": "The General"
+    },
+    {
+      "id": "warren",
+      "name": "Warren"
+    },
+    {
+      "id": "william_clift_jr",
+      "name": "William Clift Jr"
+    },
+    {
+      "id": "zev",
+      "name": "Zev"
+    }
+  ],
+  "locations": [
+    {
+      "id": "brooklyn_street",
+      "name": "Brooklyn Street"
+    },
+    {
+      "id": "charlotte_apartment",
+      "name": "Charlotte's Apartment"
+    },
+    {
+      "id": "connie_apartment",
+      "name": "Connie's Apartment"
+    },
+    {
+      "id": "dakotah_apartment",
+      "name": "Dakotah's Apartment"
+    },
+    {
+      "id": "mary_hamptons_house",
+      "name": "Mary's Hamptons House"
+    },
+    {
+      "id": "projection_booth",
+      "name": "Projection Booth"
+    },
+    {
+      "id": "screening_room_balcony",
+      "name": "Screening Room Balcony"
+    },
+    {
+      "id": "screening_room_orchestra",
+      "name": "Screening Room Orchestra"
+    },
+    {
+      "id": "tailor_shop",
+      "name": "Tailor Shop"
+    },
+    {
+      "id": "theater_lobby",
+      "name": "Theater Lobby"
+    },
+    {
+      "id": "theater_office",
+      "name": "Theater Office"
+    },
+    {
+      "id": "zev_bedroom",
+      "name": "Zev's Bedroom"
+    },
+    {
+      "id": "zev_house",
+      "name": "Zev's House"
+    }
+  ]
+}

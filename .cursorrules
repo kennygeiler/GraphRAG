@@ -1,0 +1,41 @@
+# Project Memory: Narrative MRI (Cinema Four)
+
+**Authoritative context:** See **`strategy.md`** in the repo root for full project state, roadmap, metric definitions, dashboard map, and strict AI rules. **Update `strategy.md` on every major milestone or strategy pivot**; keep this file as a short mirror for Cursor.
+
+**Current Date:** March 2026  
+**Lead Architect:** Kenny Geiler  
+**Core Philosophy:** "Ruthless Structuralism." We do not map vibes; we map Narrative Physics (Agency, Friction, and Prop-Utility).
+
+## 1. Project State
+
+- **Input:** `.fdx` (Final Draft) → XML → JSON (86 scenes).
+- **Graph:** Neo4j (`Character`, `Location`, `Prop`, `Event` nodes).
+- **Extraction:** Claude 3.5 Sonnet / Haiku via `instructor` for validated Pydantic schemas.
+- **Current Progress:** Phase 1 (Ingestion) and Phase 2 (Analytics) are live.
+- **Dashboard:** `app.py` — **Narrative Radiologist** Streamlit app. Under the main “Narrative Radiologist” tab, nested **`st.tabs`**: **Story Analytics** (pacing + radiology report), **Character Arcs** (passivity + Zev vs Alan power cross; ensemble bars require **≥5** `IN_SCENE` per character), **Production Logistics** (Chekhov audit, entity health, scene inspector, director notes to `:MRIMeta` / first `:Event`). **Pipeline Engine** tab: DB + JSON nuke, `.fdx` upload, four-stage pipeline with live logs.
+
+## 2. The "MRI" Physics (Rules to Follow)
+
+- **Passivity Index:** `In-Degree / (In-Degree + Out-Degree)` on `CONFLICTS_WITH` + `USES` (including incoming `USES` on possessed props). High score = more passive; low = more agency. **Arc check (UI):** Zev’s windowed passivity **Act I vs Act III** (scene thirds of `max(Event.number)`); flag if passivity does **not** drop by at least **20%** from Act I to Act III (`ACT_PASSIVITY_DROP_MIN` in `app.py`).
+- **Scene Heat:** In-scene ratio: **unique unordered conflict pairs** (entities with `CONFLICTS_WITH` either way in that scene) **÷** `IN_SCENE` count into that event — not raw edge count (avoids dialogue bloat). **Pacing / slump (UI):** **3+ consecutive** scenes (with defined heat) each **< 0.1** → “Act 2 slump” style alert (`SLUMP_HEAT_THRESHOLD` in `app.py`). **Radiology report:** scenes with `IN_SCENE` but **zero** in-scene conflict pairs are flagged as potential **dead air** (exposition-only beats).
+- **Chekhov’s Filter:** Props are "load-bearing" in the props table if they have **≥2** aggregate `USES` or `CONFLICTS_WITH` touches (`get_load_bearing_props`). **Loose-thread audit:** props with **POSSESSES** co-present in **Act I** but **no** `USES` or `CONFLICTS_WITH` with both ends **IN_SCENE** to the same **Act III** event → “unfired gun” style flag (`get_props_act1_possess_no_act3_payoff` in `metrics.py`). Ignore set dressing via the existing name filter in metrics.
+- **Verification:** Every narrative relationship MUST have a `source_quote` with verbatim script text—no paraphrase or summary.
+
+## 3. Tech Stack
+
+- **Backend:** Python 3.12, `uv` for package management.
+- **Database:** Neo4j (GraphRAG); Cypher MUST use parameterized queries (no string-concatenated user input in Cypher).
+- **Frontend:** Streamlit + Plotly.
+- **LLM:** Anthropic (Sonnet 3.5 / Haiku 3 family IDs as configured in repo).
+
+## 4. Implementation Norms (Engineering)
+
+- Use **Pydantic** (and `instructor` response models) for structured LLM outputs.
+- Use the **official `neo4j` Python driver**; prefer parameterized `session.run` / `execute_write` patterns consistent with existing modules (`neo4j_loader.py`, `metrics.py`, `reconcile.py`).
+- Do not add CLI wrappers unless the user explicitly asks for a script entrypoint.
+
+## 5. Immediate Strategy (Road Ahead)
+
+- **Phase 2.5:** Entity reconciliation (fuzzy matching, e.g. "The General" vs "General")—see `reconcile.py`.
+- **Phase 3:** Production complexity overlay (costing / complexity from node density and graph signals).
+- **Phase 4 (exploratory):** Sentiment and subtext tagging on relationship edges—pursue only if it stays grounded in `source_quote` / evidence and does not replace structural metrics.

@@ -1,0 +1,1144 @@
+{
+  "sample_scenes": [
+    1,
+    40,
+    86
+  ],
+  "scenes": [
+    {
+      "scene_number": 1,
+      "heading": "INT. ALAN'S OFFICE - SHORTLY BEFORE",
+      "nodes": [
+        {
+          "id": "alan",
+          "label": "Character"
+        },
+        {
+          "id": "charlotte",
+          "label": "Character"
+        },
+        {
+          "id": "connie",
+          "label": "Character"
+        },
+        {
+          "id": "jimmy",
+          "label": "Character"
+        },
+        {
+          "id": "mary",
+          "label": "Character"
+        },
+        {
+          "id": "robert",
+          "label": "Character"
+        },
+        {
+          "id": "warren",
+          "label": "Character"
+        },
+        {
+          "id": "scene_1",
+          "label": "Event"
+        },
+        {
+          "id": "projection_booth",
+          "label": "Location"
+        },
+        {
+          "id": "screening_room_orchestra",
+          "label": "Location"
+        },
+        {
+          "id": "theater_office",
+          "label": "Location"
+        },
+        {
+          "id": "accounting_notebook",
+          "label": "Prop"
+        },
+        {
+          "id": "bandana",
+          "label": "Prop"
+        },
+        {
+          "id": "cigarette",
+          "label": "Prop"
+        },
+        {
+          "id": "clipboard",
+          "label": "Prop"
+        },
+        {
+          "id": "court_letter",
+          "label": "Prop"
+        },
+        {
+          "id": "directors_viewfinder",
+          "label": "Prop"
+        },
+        {
+          "id": "large_soda",
+          "label": "Prop"
+        },
+        {
+          "id": "neck_scarf",
+          "label": "Prop"
+        },
+        {
+          "id": "notes_on_the_cinematographer",
+          "label": "Prop"
+        },
+        {
+          "id": "street_cart_coffee",
+          "label": "Prop"
+        },
+        {
+          "id": "sunglasses",
+          "label": "Prop"
+        }
+      ],
+      "relationships": [
+        {
+          "source": "jimmy",
+          "target": "charlotte",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "JIMMY\nCharlotte! You didn't think that was a touch strange? An empty theater and a packed first row?"
+        },
+        {
+          "source": "jimmy",
+          "target": "charlotte",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "She cost us some serious cash. She's practically eviscerated Zev's first dozen checks."
+        },
+        {
+          "source": "jimmy",
+          "target": "charlotte",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "Don't even try to bring this down on me! Besides, The General thinks he's fighting for a hill in South Pacific. You run this place, own up!"
+        },
+        {
+          "source": "jimmy",
+          "target": "connie",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "Shit, Connie, we stopped the birthday tickets years ago."
+        },
+        {
+          "source": "jimmy",
+          "target": "connie",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "JIMMY\n(at Connie)\nI know the Quay! And there's no way, the Quay use clay! Stick to Chicken Run."
+        },
+        {
+          "source": "jimmy",
+          "target": "mary",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "JIMMY\nJesus Christ, Mary, we're all suffering!"
+        },
+        {
+          "source": "jimmy",
+          "target": "robert",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "You're still working on Yobification? Hasn't it been like four years?"
+        },
+        {
+          "source": "jimmy",
+          "target": "robert",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "ROBERT\nWhat about the Soviet Union? A completely classless society.\nJIMMY\nWhat a crock of shit."
+        },
+        {
+          "source": "mary",
+          "target": "charlotte",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "MARY (fed up) You mean that pervert who made a movie called Manhattan?"
+        },
+        {
+          "source": "mary",
+          "target": "charlotte",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "You bring up a monster during a religious ceremony and think it's going work out?"
+        },
+        {
+          "source": "mary",
+          "target": "charlotte",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "Fuckin' slimy bitch. I knew this was all too convenient."
+        },
+        {
+          "source": "mary",
+          "target": "charlotte",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "Charlotte, I can't believe she set this whole thing up."
+        },
+        {
+          "source": "alan",
+          "target": "charlotte",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Actually, it was Charlotte who introduced me to Alan."
+        },
+        {
+          "source": "alan",
+          "target": "charlotte",
+          "type": "INTERACTS_WITH",
+          "source_quote": "I thought he could help the theater, I spoke to Alan... and it's working!"
+        },
+        {
+          "source": "alan",
+          "target": "connie",
+          "type": "INTERACTS_WITH",
+          "source_quote": "(deflated, under their breaths)\nElaine May."
+        },
+        {
+          "source": "alan",
+          "target": "jimmy",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Alan walks over to Jimmy. Alan whispers into Jimmy's ear, who nods along."
+        },
+        {
+          "source": "alan",
+          "target": "jimmy",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Alan sees him and jumps to chat with him. ALAN Jim! Hold on a second."
+        },
+        {
+          "source": "alan",
+          "target": "jimmy",
+          "type": "INTERACTS_WITH",
+          "source_quote": "JIMMY\n(frustrated)\nDistance is a construct. It's only relative to your perspective of the third dimension.\n(turning to Robert)\nRobert."
+        },
+        {
+          "source": "alan",
+          "target": "mary",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Mary, please, you're still our curator, you always will be, but we want a fresh pair of -"
+        },
+        {
+          "source": "alan",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "(deflated, under their breaths)\nElaine May."
+        },
+        {
+          "source": "connie",
+          "target": "robert",
+          "type": "INTERACTS_WITH",
+          "source_quote": "I don't want to smoke a full one, Robby, can we split?"
+        },
+        {
+          "source": "connie",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Connie and Warren walk towards their cubbies together as Zev watches them disappear."
+        },
+        {
+          "source": "connie",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Warren shoots a glance to Connie."
+        },
+        {
+          "source": "connie",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Warren and Connie are giggling."
+        },
+        {
+          "source": "connie",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Whose side will you be on?"
+        },
+        {
+          "source": "jimmy",
+          "target": "charlotte",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Should we wait for your car?"
+        },
+        {
+          "source": "jimmy",
+          "target": "connie",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Stop. Connie, can you go find The General please? He should be here to defend himself against this ableist slander."
+        },
+        {
+          "source": "jimmy",
+          "target": "connie",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Jimmy overhears them talking and scoots over to them from his hiding spot."
+        },
+        {
+          "source": "jimmy",
+          "target": "connie",
+          "type": "INTERACTS_WITH",
+          "source_quote": "We're meeting Jimmy at Party City."
+        },
+        {
+          "source": "jimmy",
+          "target": "mary",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Jimmy stops dancing, skips to the screening room door, and pokes his head out... (calling to them) Get in here!"
+        },
+        {
+          "source": "jimmy",
+          "target": "mary",
+          "type": "INTERACTS_WITH",
+          "source_quote": "JIMMY\n(argumentative, to Mary)\nEquality is just not equipped to produce art."
+        },
+        {
+          "source": "jimmy",
+          "target": "mary",
+          "type": "INTERACTS_WITH",
+          "source_quote": "JIMMY: Nah, Mary's ducking out east to her family's place."
+        },
+        {
+          "source": "jimmy",
+          "target": "mary",
+          "type": "INTERACTS_WITH",
+          "source_quote": "JIMMY Mary. MARY What?"
+        },
+        {
+          "source": "jimmy",
+          "target": "mary",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Mary hands out subs to Warren, Jimmy, Robert, and Connie."
+        },
+        {
+          "source": "jimmy",
+          "target": "robert",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Just like Jimmy when we ask him to read one of his poems."
+        },
+        {
+          "source": "jimmy",
+          "target": "robert",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Robert pats Jimmy on the back."
+        },
+        {
+          "source": "jimmy",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Whose side will you be on?"
+        },
+        {
+          "source": "mary",
+          "target": "charlotte",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Mary pours her a full glass, to the brim."
+        },
+        {
+          "source": "mary",
+          "target": "charlotte",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Mary went to Dalton too if you want the whole picture."
+        },
+        {
+          "source": "mary",
+          "target": "charlotte",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Mary thinks if you don't spend summers sweating in your studio next to the L train, you're missing out."
+        },
+        {
+          "source": "mary",
+          "target": "connie",
+          "type": "INTERACTS_WITH",
+          "source_quote": "MARY: (to Connie) Connie, sweetie, I texted you and you never replied. They were all out of Soba and I knew you wouldn't eat cold cuts, so here's some French bread."
+        },
+        {
+          "source": "mary",
+          "target": "connie",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Connie runs out of the theater to catch up with her."
+        },
+        {
+          "source": "mary",
+          "target": "connie",
+          "type": "INTERACTS_WITH",
+          "source_quote": "It's Mary's birthday tonight, we're going to throw a surprise party at her place."
+        },
+        {
+          "source": "mary",
+          "target": "connie",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Ooh shh! She's coming!"
+        },
+        {
+          "source": "mary",
+          "target": "robert",
+          "type": "INTERACTS_WITH",
+          "source_quote": "ROBERT\n(to Mary)\nWasn't this during Shoah?"
+        },
+        {
+          "source": "mary",
+          "target": "robert",
+          "type": "INTERACTS_WITH",
+          "source_quote": "He LAUGHS and stands up, puffing smoke, as Mary, dressed in a satin blouse and a long khaki skirt walks into the frame."
+        },
+        {
+          "source": "mary",
+          "target": "robert",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Robert begins untying her blouse, the room now filled with smoke."
+        },
+        {
+          "source": "mary",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Mary hands out subs to Warren, Jimmy, Robert, and Connie."
+        },
+        {
+          "source": "mary",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Whose side will you be on?"
+        },
+        {
+          "source": "robert",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Robert furiously grabs the phone."
+        },
+        {
+          "source": "robert",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Warren and I can provide the equipment and aesthetic sensibilities. Dante?"
+        },
+        {
+          "source": "robert",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Warren, standing beside Robert, nudges him subtly."
+        },
+        {
+          "source": "robert",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "WARREN\n(whispering to Robert)\nIs this going to push back our shoot dates?"
+        },
+        {
+          "source": "robert",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "WARREN: Jerry was wrecked on set. I won't stand for that on my crew. He's a messy bastard and a filthy drunk."
+        },
+        {
+          "source": "robert",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Warren nudges Robert. Robert doesn't take the receiver."
+        },
+        {
+          "source": "robert",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Don't go to Mars, please, we're supposed to run lines after this."
+        },
+        {
+          "source": "robert",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "We gotta catch the bus, we're supposed to be on set in thirty."
+        },
+        {
+          "source": "robert",
+          "target": "warren",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Rob and I are meeting with a big producer tonight, otherwise we'd love to..."
+        },
+        {
+          "source": "warren",
+          "target": "charlotte",
+          "type": "INTERACTS_WITH",
+          "source_quote": "WARREN (surprised) Oh, hi... I didn't know you were on the guest list."
+        },
+        {
+          "source": "alan",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "ALAN (60s) the owner of Cinema Four, is at his desk, cigarette in hand, scribbling into an accounting notebook."
+        },
+        {
+          "source": "alan",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Alan rests his cigarette in an ashtray. He sighs deeply and looks at his staff."
+        },
+        {
+          "source": "alan",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "ALAN (O.S): (from across the lobby) Jimmy!"
+        },
+        {
+          "source": "alan",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "The entire staff is in Alan's office."
+        },
+        {
+          "source": "alan",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "The entire crew is gathered in the theater office, with Alan, Dakotah, and Nathan up at the front."
+        },
+        {
+          "source": "alan",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "exit Alan's office."
+        },
+        {
+          "source": "charlotte",
+          "target": "projection_booth",
+          "type": "LOCATED_IN",
+          "source_quote": "You and The General are the only ones who have eyes in the screening room. That's all I'm saying.\nCHARLOTTE\nSo now I work the projection booth and security?"
+        },
+        {
+          "source": "charlotte",
+          "target": "projection_booth",
+          "type": "LOCATED_IN",
+          "source_quote": "CHARLOTTE (O.S) I can hardly hear you. Come on up!"
+        },
+        {
+          "source": "charlotte",
+          "target": "projection_booth",
+          "type": "LOCATED_IN",
+          "source_quote": "Charlotte opens it and welcomes Zev in as if it were her home."
+        },
+        {
+          "source": "charlotte",
+          "target": "projection_booth",
+          "type": "LOCATED_IN",
+          "source_quote": "A NOISE by the stairs indicates Charlotte is descending from the projection room"
+        },
+        {
+          "source": "charlotte",
+          "target": "projection_booth",
+          "type": "LOCATED_IN",
+          "source_quote": "the door opens, Charlotte inside fiddling with the projection equipment and holding the door open with her foot."
+        },
+        {
+          "source": "charlotte",
+          "target": "projection_booth",
+          "type": "LOCATED_IN",
+          "source_quote": "Charlotte is sitting in the projection booth when she hears a KNOCK on the door."
+        },
+        {
+          "source": "charlotte",
+          "target": "projection_booth",
+          "type": "LOCATED_IN",
+          "source_quote": "Charlotte opens the door a crack."
+        },
+        {
+          "source": "charlotte",
+          "target": "screening_room_orchestra",
+          "type": "LOCATED_IN",
+          "source_quote": "Dakotah, Charlotte and Nathan walk in from the screening room."
+        },
+        {
+          "source": "charlotte",
+          "target": "screening_room_orchestra",
+          "type": "LOCATED_IN",
+          "source_quote": "Charlotte is speed walking up the aisle to Dakotah's row."
+        },
+        {
+          "source": "charlotte",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "She stands away from the table, almost separated from the rest of the crew."
+        },
+        {
+          "source": "charlotte",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "CHARLOTTE\n(despondent)\nI'll pay... I should've been watching."
+        },
+        {
+          "source": "charlotte",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "The entire staff is in Alan's office. Zev and Charlotte are seated next to each other."
+        },
+        {
+          "source": "charlotte",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Zev and Charlotte are seated on opposite ends of the room."
+        },
+        {
+          "source": "connie",
+          "target": "screening_room_orchestra",
+          "type": "LOCATED_IN",
+          "source_quote": "Connie, Warren, Robert, and Jimmy are in the main screening room of the theater."
+        },
+        {
+          "source": "connie",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Sprawled across the small office, dejected after a long, grueling meeting is the theater's crew"
+        },
+        {
+          "source": "connie",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Connie stands and scurries out of the office."
+        },
+        {
+          "source": "connie",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Connie comes back into the room, followed by Zev, who has his hands zip-tied behind his back."
+        },
+        {
+          "source": "connie",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "The entire crew is gathered in the theater office, with Alan, Dakotah, and Nathan up at the front."
+        },
+        {
+          "source": "jimmy",
+          "target": "screening_room_orchestra",
+          "type": "LOCATED_IN",
+          "source_quote": "Connie, Warren, Robert, and Jimmy are in the main screening room of the theater."
+        },
+        {
+          "source": "jimmy",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Sprawled across the small office, dejected after a long, grueling meeting is the theater's crew"
+        },
+        {
+          "source": "jimmy",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "The crew, including Jimmy, turn and wait for him to say something."
+        },
+        {
+          "source": "jimmy",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Jimmy exits Alan's office and walks towards Mary."
+        },
+        {
+          "source": "jimmy",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "The entire crew is gathered in the theater office, with Alan, Dakotah, and Nathan up at the front."
+        },
+        {
+          "source": "mary",
+          "target": "screening_room_orchestra",
+          "type": "LOCATED_IN",
+          "source_quote": "Zev smiles and follows her, disappearing behind the screening room door."
+        },
+        {
+          "source": "mary",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Sprawled across the small office, dejected after a long, grueling meeting is the theater's crew"
+        },
+        {
+          "source": "mary",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "MARY\nWhat about pain and suffering?"
+        },
+        {
+          "source": "mary",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "The entire staff is in Alan's office."
+        },
+        {
+          "source": "mary",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "The entire crew is gathered in the theater office, with Alan, Dakotah, and Nathan up at the front."
+        },
+        {
+          "source": "mary",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Mary, dressed in a satin blouse and a long khaki skirt walks into the frame."
+        },
+        {
+          "source": "mary",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Mary is reclining on the office desk as Robert begins untying her blouse, the room now filled with smoke."
+        },
+        {
+          "source": "robert",
+          "target": "screening_room_orchestra",
+          "type": "LOCATED_IN",
+          "source_quote": "Connie, Warren, Robert, and Jimmy are in the main screening room of the theater."
+        },
+        {
+          "source": "robert",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Sprawled across the small office, dejected after a long, grueling meeting is the theater's crew"
+        },
+        {
+          "source": "robert",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "ROBERT\n(sighing)\nNo... I'll have to go to Brooklyn Mirage this weekend and sell some tranq."
+        },
+        {
+          "source": "robert",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Robert, dressed in a cheap suit and smoking a cigar, sits in Alan's office chair."
+        },
+        {
+          "source": "robert",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Mary is reclining on the office desk as Robert begins untying her blouse, the room now filled with smoke."
+        },
+        {
+          "source": "robert",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Robert is now supine on the desk, Zev standing over him, reigning blows upon him with a film reel."
+        },
+        {
+          "source": "warren",
+          "target": "screening_room_orchestra",
+          "type": "LOCATED_IN",
+          "source_quote": "Connie, Warren, Robert, and Jimmy are in the main screening room of the theater."
+        },
+        {
+          "source": "warren",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "Sprawled across the small office, dejected after a long, grueling meeting is the theater's crew"
+        },
+        {
+          "source": "warren",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "WARREN\n(whispering to Robert)\nIs this going to push back our shoot dates?"
+        },
+        {
+          "source": "warren",
+          "target": "theater_office",
+          "type": "LOCATED_IN",
+          "source_quote": "The entire crew is gathered in the theater office, with Alan, Dakotah, and Nathan up at the front."
+        },
+        {
+          "source": "alan",
+          "target": "court_letter",
+          "type": "POSSESSES",
+          "source_quote": "he snatches a letter from Alan's desk"
+        },
+        {
+          "source": "jimmy",
+          "target": "clipboard",
+          "type": "POSSESSES",
+          "source_quote": "He stands closest to Alan, with a clipboard and street-cart coffee."
+        },
+        {
+          "source": "jimmy",
+          "target": "street_cart_coffee",
+          "type": "POSSESSES",
+          "source_quote": "He stands closest to Alan, with a clipboard and street-cart coffee."
+        },
+        {
+          "source": "robert",
+          "target": "directors_viewfinder",
+          "type": "POSSESSES",
+          "source_quote": "Strapped across his chest, ready for use at a moment's notice, is a vintage director's viewfinder."
+        },
+        {
+          "source": "robert",
+          "target": "neck_scarf",
+          "type": "POSSESSES",
+          "source_quote": "he wears a neck scarf and sunglasses."
+        },
+        {
+          "source": "robert",
+          "target": "sunglasses",
+          "type": "POSSESSES",
+          "source_quote": "he wears a neck scarf and sunglasses."
+        },
+        {
+          "source": "warren",
+          "target": "large_soda",
+          "type": "POSSESSES",
+          "source_quote": "He is holding the book Notes on the Cinematographer by Robert Bresson and a large soda from the concession stand."
+        },
+        {
+          "source": "warren",
+          "target": "notes_on_the_cinematographer",
+          "type": "POSSESSES",
+          "source_quote": "He is holding the book Notes on the Cinematographer by Robert Bresson and a large soda from the concession stand."
+        },
+        {
+          "source": "alan",
+          "target": "accounting_notebook",
+          "type": "USES",
+          "source_quote": "ALAN (60s) the owner of Cinema Four, is at his desk, cigarette in hand, scribbling into an accounting notebook."
+        },
+        {
+          "source": "alan",
+          "target": "cigarette",
+          "type": "USES",
+          "source_quote": "ALAN (60s) the owner of Cinema Four, is at his desk, cigarette in hand, scribbling into an accounting notebook."
+        },
+        {
+          "source": "alan",
+          "target": "cigarette",
+          "type": "USES",
+          "source_quote": "Alan rests his cigarette in an ashtray."
+        },
+        {
+          "source": "connie",
+          "target": "bandana",
+          "type": "USES",
+          "source_quote": "Keeping her hair up with a bandana"
+        },
+        {
+          "source": "jimmy",
+          "target": "cigarette",
+          "type": "USES",
+          "source_quote": "Jimmy lights a cigarette."
+        },
+        {
+          "source": "jimmy",
+          "target": "court_letter",
+          "type": "USES",
+          "source_quote": "he snatches a letter from Alan's desk"
+        },
+        {
+          "source": "mary",
+          "target": "cigarette",
+          "type": "USES",
+          "source_quote": "she smokes a cigarette and swigs from a near-empty bottle of red wine."
+        },
+        {
+          "source": "mary",
+          "target": "cigarette",
+          "type": "USES",
+          "source_quote": "A cigarette is in her mouth, unlit."
+        },
+        {
+          "source": "robert",
+          "target": "directors_viewfinder",
+          "type": "USES",
+          "source_quote": "he takes hold of his viewfinder"
+        }
+      ]
+    },
+    {
+      "scene_number": 40,
+      "heading": "INT. ZEV'S HOUSE, DINING ROOM - LATER",
+      "nodes": [
+        {
+          "id": "charlotte",
+          "label": "Character"
+        },
+        {
+          "id": "zev",
+          "label": "Character"
+        },
+        {
+          "id": "scene_40",
+          "label": "Event"
+        },
+        {
+          "id": "zev_house",
+          "label": "Location"
+        }
+      ],
+      "relationships": [
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "Honestly, get out of my booth and get out of my life."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "ZEV: Why did you make me come?\nCHARLOTTE: Look, I don't want to hurt you.\nZEV: Just leave me alone."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "It was my fault."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "You never told me you knew each other."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "CONFLICTS_WITH",
+          "source_quote": "CHARLOTTE (mad) Wait. What? That doesn't make any sense."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Charlotte takes hold of Zev's arm and writes down her email and password on his forearm."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Charlotte laughs, touching his arm softly."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "CHARLOTTE: (whispering) Get down!"
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "She affectionately rubs Zev's hand under the table."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "They were high school sweethearts.\nZev's heart sinks."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "CHARLOTTE: Zev, what in the fuck are you talking about? Also don't bring my dad into this."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "CHARLOTTE\n(to Zev)\nZev, really?"
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "CHARLOTTE (O.S) I was starting to worry we had another cadaver on our hands. (playful) Shawn, right?"
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Charlotte walks by the group to the theater entrance and Zev opens the door for her as she approaches."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "ZEV Zev!"
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "I asked about you."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Zev follows to open the door for her."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Should we wait for Charlotte?"
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Hey!"
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "I'm on it. Sorry, I'm still using your account, I watch something new almost every night."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "ZEV: He's quite the wildcard, makes me nervous. CHARLOTTE: He's the case study on the dangers of method acting."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Zev grabs her hand. She squeezes back, and as the soundtrack to the film crescendos they both settle in to watch the movie, hand-in-hand."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Zev and Charlotte are arm-in-arm, making out."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Zev and Charlotte are seated next to each other."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "I'm going to drive her in when traffic settles down."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Zev and Charlotte sits with arms entwined, utterly oblivious to anything except one another."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Charlotte gives Zev one last quick kiss. Zev kisses Charlotte on the head"
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Charlotte knows, and they all know."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Charlotte showed me how to use the projector, I can get her out of the booth and put on our own movie."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "Zev knocks on the projection room door. The bag is to the side, out of Charlotte's sight."
+        },
+        {
+          "source": "zev",
+          "target": "zev",
+          "type": "INTERACTS_WITH",
+          "source_quote": "ZEV (V.O.)\nWhat happens when a culture destroys its very own subconscious? We may soon find out. Gibbon theorized about how empires die. A glib corporation will show us how a culture dies."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev_house",
+          "type": "LOCATED_IN",
+          "source_quote": "Charlotte walks past him inside."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev_house",
+          "type": "LOCATED_IN",
+          "source_quote": "Charlotte enters the dining room followed by Warren."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev_house",
+          "type": "LOCATED_IN",
+          "source_quote": "Jimmy, Robert, Mary, Connie, Warren, Charlotte, and Zev are at the door."
+        },
+        {
+          "source": "charlotte",
+          "target": "zev_house",
+          "type": "LOCATED_IN",
+          "source_quote": "Zev and Charlotte sits with arms entwined, utterly oblivious to anything except one another."
+        },
+        {
+          "source": "zev",
+          "target": "zev_house",
+          "type": "LOCATED_IN",
+          "source_quote": "Zev comes through the hallway to the door."
+        },
+        {
+          "source": "zev",
+          "target": "zev_house",
+          "type": "LOCATED_IN",
+          "source_quote": "Around the periphery sit the crew, the men in outsized and obviously borrowed yarmulkes. At the head of the table sits Sheryl, flanked by her son and her husband SHLOMO STERN"
+        },
+        {
+          "source": "zev",
+          "target": "zev_house",
+          "type": "LOCATED_IN",
+          "source_quote": "Charlotte takes her seat in the empty chair next to Zev."
+        },
+        {
+          "source": "zev",
+          "target": "zev_house",
+          "type": "LOCATED_IN",
+          "source_quote": "Jimmy, Robert, Mary, Connie, Warren, Charlotte, and Zev are at the door."
+        },
+        {
+          "source": "zev",
+          "target": "zev_house",
+          "type": "LOCATED_IN",
+          "source_quote": "Zev and Charlotte sits with arms entwined, utterly oblivious to anything except one another."
+        }
+      ]
+    },
+    {
+      "scene_number": 86,
+      "heading": null,
+      "nodes": [],
+      "relationships": [],
+      "error": "No Event node for this scene_number"
+    }
+  ],
+  "redundancy_check": {
+    "description": "Characters grouped by identical total IN_SCENE count across the graph (groups with at least 5 characters).",
+    "groups": [
+      {
+        "in_scene_count": 2,
+        "character_count": 5,
+        "characters": [
+          {
+            "id": "florence",
+            "name": "Florence",
+            "in_scene_count": 2
+          },
+          {
+            "id": "granny_1",
+            "name": "Granny One",
+            "in_scene_count": 2
+          },
+          {
+            "id": "granny_2",
+            "name": "Granny Two",
+            "in_scene_count": 2
+          },
+          {
+            "id": "shlomo_stern",
+            "name": "Shlomo Stern",
+            "in_scene_count": 2
+          },
+          {
+            "id": "william_clift_jr",
+            "name": "William Clift Jr",
+            "in_scene_count": 2
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "canonical_characters": [
+    "alan",
+    "charlotte",
+    "connie",
+    "dakotah",
+    "florence",
+    "granny_1",
+    "granny_2",
+    "jimmy",
+    "mary",
+    "nathan",
+    "richard",
+    "robert",
+    "sheryl",
+    "shlomo",
+    "tailor",
+    "tatyana",
+    "the_general",
+    "warren",
+    "william_clift_jr",
+    "zev"
+  ],
+  "canonical_locations": [
+    "brooklyn_street",
+    "charlotte_apartment",
+    "connie_apartment",
+    "dakotah_apartment",
+    "mary_hamptons_house",
+    "projection_booth",
+    "screening_room_balcony",
+    "screening_room_orchestra",
+    "tailor_shop",
+    "theater_lobby",
+    "theater_office",
+    "zev_bedroom",
+    "zev_house"
+  ]
+}

@@ -1,0 +1,2 @@
+# Use `uv sync` for installs (pyproject.toml + uv.lock).
+# Option A removed the legacy flat pin list; `langchain-neo4j` still pulls `langgraph` transitively for Neo4jGraph / QA only.
