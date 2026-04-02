@@ -4,7 +4,7 @@
 
 ## What this is
 
-Screenplay **GraphRAG**: `.fdx` → JSON → **Neo4j** (`Character`, `Location`, `Prop`, `Event` + `IN_SCENE` + narrative rels with `source_quote`). **Streamlit** app = **Narrative Timeline Analyzer** + HITL + graph chat + pipeline UI.
+Screenplay **GraphRAG**: `.fdx` → JSON → **Neo4j** (`Character`, `Location`, `Prop`, `Event` + `IN_SCENE` + narrative rels with `source_quote`). **Streamlit** app = **Narrative Timeline Analyzer** + ETL engine room + graph chat + pipeline UI.
 
 ## Dashboard tabs (`app.py`)
 
@@ -13,7 +13,6 @@ Screenplay **GraphRAG**: `.fdx` → JSON → **Neo4j** (`Character`, `Location`,
 | **Engine Room** | Live self-healing ETL demo: paste text → extract→validate→fix via `etl_core` LangGraph engine; `st.metric` for tokens/cost; hallucination audit log |
 | **Narrative Timeline** | Momentum line (rolling heat), Payoff Matrix (long-gap props), Power shift (top 5 × 3 acts), protagonist regression warning |
 | **Ask the graph** | Natural language → Cypher (`agent.py`) |
-| **AI Audit Log** | File-based `extraction_audit.jsonl` viewer (written by `ingest.py`) |
 | **Pipeline Engine** | Wipe DB/JSONs, upload `.fdx`, run parser → lexicon → ingest → loader with logs (hidden on cloud) |
 
 ## Act structure (dynamic)

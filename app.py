@@ -49,14 +49,6 @@ _PIPELINE_JSON_NAMES = (
     "pipeline_state.json",
 )
 _TARGET_FDX = _PROJECT_ROOT / "target_script.fdx"
-_AUDIT_LOG = _PROJECT_ROOT / "extraction_audit.jsonl"
-
-
-def _audit_log_mtime() -> float:
-    try:
-        return _AUDIT_LOG.stat().st_mtime
-    except OSError:
-        return 0.0
 
 
 def _neo4j_dashboard_cache_stamp() -> tuple[float, float]:
@@ -193,27 +185,6 @@ def _cached_act_passivity_matrix(
         return out
     finally:
         drv.close()
-
-
-@st.cache_data(ttl=120, show_spinner="Loading AI audit log…")
-def _cached_audit_rows(_audit_stamp: float) -> list[dict[str, Any]]:
-    del _audit_stamp
-    if not _AUDIT_LOG.is_file():
-        return []
-    rows: list[dict[str, Any]] = []
-    try:
-        text = _AUDIT_LOG.read_text(encoding="utf-8")
-    except OSError:
-        return []
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rows.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue
-    return rows[-800:]
 
 
 def _render_momentum_chart(
@@ -428,9 +399,6 @@ _ids_tuple = tuple(str(c["id"]) for c in top_chars)
 _extra = tuple(dict.fromkeys(list(_ids_tuple) + [PROTAGONIST_ID]))
 _act_matrix = _cached_act_passivity_matrix(_DASH_STAMP, _extra, _act_bounds_key)
 
-_AUDIT_STAMP = _audit_log_mtime()
-_audit_rows = _cached_audit_rows(_AUDIT_STAMP)
-
 st.title("Narrative Timeline Analyzer")
 st.caption("Temporal readouts over your Neo4j screenplay graph — momentum, long-horizon props, and act-bucketed agency.")
 if _act_bounds:
@@ -464,7 +432,6 @@ _tab_labels = [
     "🛠️ Engine Room",
     "Narrative Timeline",
     "Ask the graph",
-    "AI Audit Log",
 ]
 if _PIPELINE_ENGINE_ENABLED:
     _tab_labels.append("⚙️ Pipeline Engine")
@@ -473,9 +440,8 @@ _tabs = st.tabs(_tab_labels)
 tab_engine_room = _tabs[0]
 tab_timeline = _tabs[1]
 tab_chat = _tabs[2]
-tab_audit = _tabs[3]
 if _PIPELINE_ENGINE_ENABLED:
-    tab_engine = _tabs[4]
+    tab_engine = _tabs[3]
 
 with tab_engine_room:
     st.header("🛠️ Engine Room")
@@ -583,22 +549,6 @@ with tab_chat:
         with st.chat_message("assistant"):
             st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
-
-with tab_audit:
-    st.header("AI Audit Log")
-    st.caption(
-        "LangGraph extraction pipeline: **extract** → **validator** (deterministic rules + Pydantic) → "
-        "**fixer** (LLM repair) when validation fails. One JSON line per step in `extraction_audit.jsonl` "
-        "(written by `ingest.py`)."
-    )
-    if not _audit_rows:
-        st.info("No audit entries yet. Run **`uv run python ingest.py`** to populate.")
-    else:
-        st.metric("Logged steps (last 800)", len(_audit_rows))
-        df_audit = pd.DataFrame(_audit_rows)
-        st.dataframe(df_audit, use_container_width=True, height=420)
-        with st.expander("Raw JSONL path"):
-            st.code(str(_AUDIT_LOG), language="text")
 
 if _PIPELINE_ENGINE_ENABLED:
     with tab_engine:

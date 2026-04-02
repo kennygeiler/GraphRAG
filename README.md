@@ -19,7 +19,7 @@
 
 coverage is subjective. “does act two drag?” “is my protagonist reactive?” “did we forget the gun?” you get opinions. you don’t get **reproducible** answers tied to the actual script.
 
-**narrative mri** turns a screenplay into a **queryable graph**: who conflicts with whom, in which scene, with **proof text** on the relationship. from that graph you compute **momentum** (rolling friction), **passivity by act**, and **long-arc props**—and you can **human-in-the-loop** verify scenes before you trust the metrics.
+**narrative mri** turns a screenplay into a **queryable graph**: who conflicts with whom, in which scene, with **proof text** on the relationship. from that graph you compute **momentum** (rolling friction), **passivity by act**, and **long-arc props**.
 
 full detail lives in [`strategy.md`](strategy.md). quick context: [`MEMORY.md`](MEMORY.md). agents: [`AGENTS.md`](AGENTS.md).
 
@@ -108,7 +108,7 @@ wide-layout streamlit. main analytics: **narrative timeline**.
 | **payoff matrix** | long-horizon props: first intro vs last `USES` / `CONFLICTS_WITH` separated by **> 10** scene numbers (drops noise). |
 | **power shift** | passivity index (in / total on `CONFLICTS_WITH` + `USES` in act windows) for **top 5** characters by interaction volume. **`st.warning`** if configured protagonist (**`zev`** in code) is **more** passive in act 3 than act 1. |
 
-other tabs: **engine room** (live self-healing ETL demo — paste text, watch extract→validate→fix with token/cost metrics), **ask the graph** (`agent.py`), **ai audit log**, **pipeline engine** (local `uv` chain — hidden in cloud when `DISABLE_PIPELINE_ENGINE=1`).
+other tabs: **engine room** (live self-healing ETL demo — paste text, watch extract→validate→fix with token/cost metrics), **ask the graph** (`agent.py`), **pipeline engine** (local `uv` chain — hidden in cloud when `DISABLE_PIPELINE_ENGINE=1`).
 
 ## quick start
 
