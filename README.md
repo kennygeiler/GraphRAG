@@ -108,7 +108,7 @@ wide-layout streamlit. main analytics: **narrative timeline**.
 | **payoff matrix** | long-horizon props: first intro vs last `USES` / `CONFLICTS_WITH` separated by **> 10** scene numbers (drops noise). |
 | **power shift** | passivity index (in / total on `CONFLICTS_WITH` + `USES` in act windows) for **top 5** characters by interaction volume. **`st.warning`** if configured protagonist (**`zev`** in code) is **more** passive in act 3 than act 1. |
 
-other tabs: **human-in-the-loop** (`hitl.py`), **ask the graph** (`agent.py`), **pipeline engine** (local `uv` chain—hidden in cloud when `DISABLE_PIPELINE_ENGINE=1`).
+other tabs: **engine room** (live self-healing ETL demo — paste text, watch extract→validate→fix with token/cost metrics), **human-in-the-loop** (`hitl.py`), **ask the graph** (`agent.py`), **ai audit log**, **pipeline engine** (local `uv` chain — hidden in cloud when `DISABLE_PIPELINE_ENGINE=1`).
 
 ## quick start
 
@@ -196,20 +196,33 @@ NEO4J_URI=bolt://localhost:7687 NEO4J_USER=neo4j NEO4J_PASSWORD='your-secure-pas
 
 ```
 GraphRAG/
-├── parser.py              # .fdx → raw_scenes.json (xml only)
-├── lexicon.py             # claude → master_lexicon.json
-├── ingest.py              # per-scene SceneGraph → validated_graph.json
-├── neo4j_loader.py        # json → neo4j
-├── schema.py              # pydantic graph contract
-├── metrics.py             # cypher analytics
-├── app.py                 # streamlit + plotly
-├── hitl.py                # draft vs gold scene review
-├── agent.py               # nl → cypher (optional)
+├── etl_core/                  # domain-agnostic self-healing ETL engine
+│   ├── config.py              #   .env + langsmith bootstrap
+│   ├── state.py               #   langgraph ETLState (tokens, cost, audit)
+│   ├── telemetry.py           #   anthropic pricing + accumulate_usage
+│   ├── errors.py              #   MaxRetriesError
+│   └── graph_engine.py        #   langgraph: extract → validate → fix loop
+├── domains/
+│   └── screenplay/            # screenplay-specific domain plug-in
+│       ├── schemas.py         #   re-exports SceneGraph, Relationship
+│       ├── rules.py           #   deterministic validation (no AI)
+│       └── adapter.py         #   DomainBundle wiring LLM + rules
+├── parser.py                  # .fdx → raw_scenes.json (xml only)
+├── lexicon.py                 # claude → master_lexicon.json
+├── ingest.py                  # per-scene extraction → validated_graph.json
+├── extraction_llm.py          # anthropic + instructor calls (with usage)
+├── extraction_graph.py        # thin adapter → etl_core pipeline
+├── neo4j_loader.py            # json → neo4j
+├── schema.py                  # pydantic graph contract
+├── metrics.py                 # cypher analytics
+├── app.py                     # streamlit: engine room + narrative charts
+├── hitl.py                    # draft vs gold scene review
+├── agent.py                   # nl → cypher (optional)
 ├── Dockerfile
-├── docker-compose.yml     # app → external neo4j / aura
+├── docker-compose.yml         # app → external neo4j / aura
 ├── docker-compose.stack.yml   # neo4j + app on one host
-├── render.yaml            # render blueprint
-├── strategy.md            # authoritative project brain
+├── render.yaml                # render blueprint
+├── strategy.md                # authoritative project brain
 ├── MEMORY.md
 └── AGENTS.md
 ```

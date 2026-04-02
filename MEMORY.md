@@ -1,6 +1,6 @@
 # Project memory (compact)
 
-**Last aligned:** March 2026. For full detail use **`strategy.md`**.
+**Last aligned:** April 2026. For full detail use **`strategy.md`**.
 
 ## What this is
 
@@ -10,10 +10,12 @@ Screenplay **GraphRAG**: `.fdx` → JSON → **Neo4j** (`Character`, `Location`,
 
 | Tab | Purpose |
 |-----|---------|
+| **Engine Room** | Live self-healing ETL demo: paste text → extract→validate→fix via `etl_core` LangGraph engine; `st.metric` for tokens/cost; hallucination audit log |
 | **Narrative Timeline** | Momentum line (rolling heat), Payoff Matrix (long-gap props), Power shift (top 5 × 3 acts), protagonist regression warning |
 | **Human-in-the-Loop** | Non-`VERIFIED` scenes → edit graph → approve |
 | **Ask the graph** | Natural language → Cypher (`agent.py`) |
-| **Pipeline Engine** | Wipe DB/JSONs, upload `.fdx`, run parser → lexicon → ingest → loader with logs |
+| **AI Audit Log** | File-based `extraction_audit.jsonl` viewer (written by `ingest.py`) |
+| **Pipeline Engine** | Wipe DB/JSONs, upload `.fdx`, run parser → lexicon → ingest → loader with logs (hidden on cloud) |
 
 ## Act structure (dynamic)
 
@@ -29,6 +31,10 @@ From Neo4j: **`get_script_act_bounds`** in `metrics.py` — `min(:Event.number)`
 ## Separate: “scene heat” in `metrics.py`
 
 **Distinct** from momentum heat: **unique unordered conflict pairs** in-scene ÷ `IN_SCENE` count (`get_scene_heat`). Still used in CLI / diagnostics; not the same formula as the momentum chart.
+
+## Architecture: engine vs domain
+
+Generic ETL engine lives in `etl_core/` (LangGraph state machine, telemetry, cost tracking). Screenplay-specific models and rules live in `domains/screenplay/`. The engine accepts a pluggable `DomainBundle` so it can be reused for other domains without touching core logic.
 
 ## Pipeline order (cold start)
 

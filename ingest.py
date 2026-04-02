@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dotenv import load_dotenv
+from etl_core.config import enable_langsmith, load_env
 
-load_dotenv()
+load_env()
+enable_langsmith()
 
 import argparse
 import json
@@ -17,7 +18,7 @@ from anthropic import APIStatusError
 from pydantic import ValidationError
 
 from extraction_graph import run_extraction_pipeline
-from extraction_llm import _get_anthropic_client
+from extraction_llm import _ensure_clients
 from schema import SceneGraph
 
 from pipeline_state import update_ingest_progress
@@ -226,7 +227,7 @@ def main() -> None:
 
     total = len(scenes)
     system_prompt = _build_system_prompt(lexicon_content)
-    _get_anthropic_client()
+    _ensure_clients()
 
     expected_nums = {_scene_number_key(s, j + 1) for j, s in enumerate(scenes)}
 
@@ -266,6 +267,8 @@ def main() -> None:
     interrupted = False
     last_scene_index = 0
     checkpoint = not args.no_checkpoint
+    cumulative_tokens = 0
+    cumulative_cost = 0.0
 
     try:
         for i, scene in enumerate(scenes, start=1):
@@ -285,8 +288,10 @@ def main() -> None:
                 }
             else:
                 try:
-                    graph, audit_entries, pipe_err = run_extraction_pipeline(sn, user_text, system_prompt)
+                    graph, audit_entries, pipe_err, telem = run_extraction_pipeline(sn, user_text, system_prompt)
                     _append_audit_entries(args.audit_log, audit_entries)
+                    cumulative_tokens += telem.get("total_tokens", 0)
+                    cumulative_cost += telem.get("total_cost", 0.0)
                     if pipe_err:
                         raise RuntimeError(pipe_err)
                 except ValidationError as exc:
@@ -356,6 +361,11 @@ def main() -> None:
             print(
                 f"Done. Wrote {len(ordered)} scene graph(s) to {args.output.name}. "
                 f"Successfully extracted relationships (total): {total_relationships}",
+                flush=True,
+            )
+        if cumulative_tokens:
+            print(
+                f"Telemetry: {cumulative_tokens:,} tokens | ${cumulative_cost:.4f} estimated cost",
                 flush=True,
             )
         missing_ct = len(expected_nums_fin - set(by_num.keys()))

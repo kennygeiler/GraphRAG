@@ -17,6 +17,9 @@ import streamlit as st
 import hitl
 
 from agent import ask_narrative_mri
+from domains.screenplay.adapter import get_bundle as _screenplay_bundle
+from etl_core.errors import MaxRetriesError
+from etl_core.graph_engine import run_pipeline as _run_etl
 from metrics import (
     get_driver,
     get_narrative_momentum_by_scene,
@@ -460,6 +463,7 @@ with st.sidebar:
         )
 
 _tab_labels = [
+    "🛠️ Engine Room",
     "Narrative Timeline",
     "Human-in-the-Loop validation",
     "Ask the graph",
@@ -469,12 +473,91 @@ if _PIPELINE_ENGINE_ENABLED:
     _tab_labels.append("⚙️ Pipeline Engine")
 
 _tabs = st.tabs(_tab_labels)
-tab_timeline = _tabs[0]
-tab_hitl = _tabs[1]
-tab_chat = _tabs[2]
-tab_audit = _tabs[3]
+tab_engine_room = _tabs[0]
+tab_timeline = _tabs[1]
+tab_hitl = _tabs[2]
+tab_chat = _tabs[3]
+tab_audit = _tabs[4]
 if _PIPELINE_ENGINE_ENABLED:
-    tab_engine = _tabs[4]
+    tab_engine = _tabs[5]
+
+with tab_engine_room:
+    st.header("🛠️ Engine Room")
+    st.caption(
+        "Run the self-healing ETL pipeline on raw text. The LangGraph engine does "
+        "**extract → validate → fix** (up to 3 retries) with full token/cost telemetry."
+    )
+
+    _er_text = st.text_area(
+        "Paste raw scene text",
+        height=200,
+        placeholder="--- Scene 42 ---\nINT. COURTHOUSE - DAY\nZev throws the court letter at Alan...",
+        key="engine_room_text",
+    )
+
+    _er_prompt = st.text_input(
+        "System prompt override (leave blank for default screenplay prompt)",
+        key="engine_room_prompt",
+    )
+
+    if st.button("Run ETL Pipeline", type="primary", key="engine_room_run", disabled=not _er_text.strip()):
+        bundle = _screenplay_bundle()
+        sys_prompt = _er_prompt.strip() or (
+            "You are a Narrative Graph Architect. Extract Character, Location, and Prop nodes "
+            "and their Relationships from the provided scene. Every relationship MUST include "
+            "a source_quote which is the exact, verbatim text from the script."
+        )
+        with st.status("ETL Pipeline running…", expanded=True) as _er_status:
+            try:
+                state = _run_etl(
+                    bundle,
+                    raw_text=_er_text.strip(),
+                    system_prompt=sys_prompt,
+                    doc_id="engine_room",
+                )
+                _er_status.update(label="Pipeline complete", state="complete")
+            except MaxRetriesError as exc:
+                _er_status.update(label="Validation failed after max retries", state="error")
+                st.error(str(exc))
+                state = None
+            except Exception as exc:
+                _er_status.update(label="Pipeline error", state="error")
+                st.error(f"{type(exc).__name__}: {exc}")
+                state = None
+
+        if state is not None:
+            c1, c2 = st.columns(2)
+            with c1:
+                st.metric("Total tokens", f"{state.get('total_tokens', 0):,}")
+            with c2:
+                st.metric("Estimated cost", f"${state.get('total_cost', 0.0):.4f}")
+
+            st.subheader("Extracted graph")
+            st.json(state.get("current_json", {}))
+
+            trail = state.get("audit_trail") or []
+            if trail:
+                with st.expander(f"Hallucination Audit Log ({len(trail)} steps)", expanded=True):
+                    for entry in trail:
+                        node = entry.get("node", "?")
+                        detail = entry.get("detail", "")
+                        if node == "fixer":
+                            st.markdown(f"**{node}** — attempt {entry.get('attempt', '?')}")
+                            col_before, col_after = st.columns(2)
+                            with col_before:
+                                st.caption("Before (broken)")
+                                st.json(entry.get("before", {}))
+                            with col_after:
+                                st.caption("After (fixed)")
+                                st.json(entry.get("after", {}))
+                            if entry.get("reason"):
+                                st.caption(f"Reason: {entry['reason']}")
+                        elif entry.get("error"):
+                            st.markdown(f"**{node}** — {detail}")
+                            st.code(entry["error"], language="text")
+                        else:
+                            st.markdown(f"**{node}** — {detail}")
+                        st.divider()
 
 with tab_timeline:
     _render_momentum_chart(momentum_rows, _act_bounds)
