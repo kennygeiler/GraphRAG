@@ -470,12 +470,23 @@ if _PIPELINE_ENABLED:
             _TARGET_FDX.write_bytes(_up.getvalue())
             st.success(f"Saved **{_TARGET_FDX.name}** ({len(_up.getvalue()):,} bytes)")
 
-        _enable_audit = st.checkbox(
-            "Enable LLM auditors (Quote Fidelity, Completeness, Attribution)",
-            value=True,
-            help="Adds 3 AI auditor calls per scene (~30 s extra). Uncheck for a faster run with deterministic checks only.",
-            key="pipeline_enable_audit",
-        )
+        col_opt1, col_opt2 = st.columns(2)
+        with col_opt1:
+            _scene_limit = st.number_input(
+                "Scene limit",
+                min_value=1,
+                max_value=999,
+                value=86,
+                help="How many scenes to process. Set low (e.g. 3–5) to test the agent on a small slice.",
+                key="pipeline_scene_limit",
+            )
+        with col_opt2:
+            _enable_audit = st.checkbox(
+                "Enable LLM auditors",
+                value=True,
+                help="Adds 3 AI auditor calls per scene (~30 s extra). Uncheck for a faster run with deterministic checks only.",
+                key="pipeline_enable_audit",
+            )
 
         if st.button(
             "Run Pipeline",
@@ -525,6 +536,9 @@ if _PIPELINE_ENABLED:
 
                 if raw_scenes:
                     # Stage 3: Extract scenes (the big loop)
+                    if _scene_limit and _scene_limit < len(raw_scenes):
+                        raw_scenes = raw_scenes[:int(_scene_limit)]
+                        scene_log.write(f"Scene limit: processing first **{len(raw_scenes)}** scenes.")
                     total = len(raw_scenes)
                     pipe_status.update(
                         label=f"Stage 3 — Extracting 0/{total} scenes (each takes ~30-60 s with auditors)…",
