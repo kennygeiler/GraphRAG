@@ -43,6 +43,7 @@ class SceneResult:
     status: Literal["skip", "ok", "fixed", "failed", "empty"]
     graph_entry: dict[str, Any] | None = None
     audit_entries: list[dict[str, Any]] = field(default_factory=list)
+    warnings: list[dict[str, Any]] = field(default_factory=list)
     tokens: int = 0
     cost: float = 0.0
     error: str | None = None
@@ -177,6 +178,7 @@ def extract_scenes(
     system_prompt: str,
     *,
     existing_by_num: dict[int, dict[str, Any]] | None = None,
+    lexicon_ids: set[str] | None = None,
 ) -> Iterator[SceneResult]:
     """Yield one :class:`SceneResult` per scene.
 
@@ -214,8 +216,9 @@ def extract_scenes(
 
         user_text = format_scene_user_message(scene)
         try:
-            graph, audit_entries, pipe_err, telem = run_extraction_pipeline(
+            graph, audit_entries, pipe_err, telem, pipe_warnings = run_extraction_pipeline(
                 sn, user_text, system_prompt,
+                lexicon_ids=lexicon_ids,
             )
             if pipe_err:
                 raise RuntimeError(pipe_err)
@@ -239,6 +242,7 @@ def extract_scenes(
             status="fixed" if had_fix else "ok",
             graph_entry=entry,
             audit_entries=audit_entries,
+            warnings=pipe_warnings,
             tokens=telem.get("total_tokens", 0),
             cost=telem.get("total_cost", 0.0),
         )
@@ -308,6 +312,14 @@ def main() -> None:
 
     lexicon_obj = json.loads(args.lexicon.read_text(encoding="utf-8"))
     lexicon_content = json.dumps(lexicon_obj, ensure_ascii=False, indent=2)
+    lexicon_ids: set[str] = set()
+    if isinstance(lexicon_obj, dict):
+        for entry in lexicon_obj.get("characters", []):
+            if isinstance(entry, dict) and entry.get("id"):
+                lexicon_ids.add(entry["id"])
+        for entry in lexicon_obj.get("locations", []):
+            if isinstance(entry, dict) and entry.get("id"):
+                lexicon_ids.add(entry["id"])
 
     scenes: list[dict[str, Any]] = json.loads(args.raw_scenes.read_text(encoding="utf-8"))
     if not isinstance(scenes, list):
@@ -359,7 +371,7 @@ def main() -> None:
     cumulative_cost = 0.0
 
     try:
-        for result in extract_scenes(scenes, system_prompt, existing_by_num=by_num):
+        for result in extract_scenes(scenes, system_prompt, existing_by_num=by_num, lexicon_ids=lexicon_ids):
             last_scene_index = result.index
             sn = result.scene_number
 

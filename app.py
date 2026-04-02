@@ -498,8 +498,10 @@ if _PIPELINE_ENABLED:
                     # Stage 2: Build lexicon
                     pipe_status.update(label="Stage 2 — Building lexicon…", state="running")
                     progress.progress(0.10, text="Building lexicon (LLM call)…")
+                    lexicon_ids: set[str] = set()
                     try:
                         master = build_master_lexicon()
+                        lexicon_ids = {e.id for e in master.characters} | {e.id for e in master.locations}
                         scene_log.write(
                             f"Lexicon: **{len(master.characters)}** characters, "
                             f"**{len(master.locations)}** locations."
@@ -520,12 +522,15 @@ if _PIPELINE_ENABLED:
                     total = len(raw_scenes)
                     all_entries: list[dict[str, Any]] = []
                     all_audit: list[dict[str, Any]] = []
+                    all_warnings: list[dict[str, Any]] = []
                     corrections: list[dict[str, Any]] = []
                     cum_tokens = 0
                     cum_cost = 0.0
                     failed_count = 0
 
-                    for result in extract_scenes(raw_scenes, system_prompt):
+                    for result in extract_scenes(
+                        raw_scenes, system_prompt, lexicon_ids=lexicon_ids,
+                    ):
                         frac = 0.10 + 0.85 * (result.index / total)
                         status_icon = {
                             "skip": "⏭️", "empty": "⬜", "ok": "✅",
@@ -546,6 +551,11 @@ if _PIPELINE_ENABLED:
                         cum_tokens += result.tokens
                         cum_cost += result.cost
 
+                        if result.warnings:
+                            for w in result.warnings:
+                                w.setdefault("scene_number", result.scene_number)
+                            all_warnings.extend(result.warnings)
+
                         if result.status == "failed":
                             failed_count += 1
                         if result.status == "fixed":
@@ -561,6 +571,7 @@ if _PIPELINE_ENABLED:
                     st.session_state["pipeline_results"] = {
                         "entries": all_entries,
                         "audit_trail": all_audit,
+                        "warnings": all_warnings,
                         "corrections": corrections,
                         "total_scenes": total,
                         "extracted": len(all_entries),
@@ -571,19 +582,26 @@ if _PIPELINE_ENABLED:
 
             pr = st.session_state.get("pipeline_results")
             if pr:
-                c1, c2, c3, c4 = st.columns(4)
+                c1, c2, c3, c4, c5 = st.columns(5)
                 with c1:
                     st.metric("Scenes extracted", f"{pr['extracted']}/{pr['total_scenes']}")
                 with c2:
                     st.metric("Corrections", len(pr["corrections"]))
                 with c3:
-                    st.metric("Total tokens", f"{pr['tokens']:,}")
+                    st.metric("Warnings", len(pr.get("warnings", [])))
                 with c4:
+                    st.metric("Total tokens", f"{pr['tokens']:,}")
+                with c5:
                     st.metric("Estimated cost", f"${pr['cost']:.4f}")
 
-                if pr["corrections"]:
+                if pr["corrections"] or pr.get("warnings"):
+                    parts = []
+                    if pr["corrections"]:
+                        parts.append(f"**{len(pr['corrections'])}** correction(s)")
+                    if pr.get("warnings"):
+                        parts.append(f"**{len(pr['warnings'])}** warning(s)")
                     st.info(
-                        f"The Editor Agent made **{len(pr['corrections'])}** correction(s). "
+                        f"The Editor Agent flagged {' and '.join(parts)}. "
                         "Review them in the **Editor Agent** tab, then approve to load into Neo4j."
                     )
                 elif pr["extracted"] > 0:
@@ -603,22 +621,24 @@ if _PIPELINE_ENABLED:
 with tab_editor:
     st.header("Editor Agent")
     st.caption(
-        "Review the AI's self-corrections before loading data into Neo4j. "
-        "Scenes where the Editor Agent's fixer intervened are shown below with before/after diffs."
+        "Review the AI's self-corrections and warnings before loading data into Neo4j."
     )
 
     pr = st.session_state.get("pipeline_results")
     if not pr:
         st.info("No pipeline results yet. Run the pipeline first.")
     else:
+        n_corrections = len(pr["corrections"])
+        n_warnings = len(pr.get("warnings", []))
         st.markdown(
-            f"**{pr['extracted']}** scenes extracted, "
-            f"**{len(pr['corrections'])}** correction(s) by the Editor Agent, "
+            f"**{pr['extracted']}** scenes extracted — "
+            f"**{n_corrections}** error(s) auto-fixed, "
+            f"**{n_warnings}** warning(s) for review, "
             f"**{pr['failed']}** failed."
         )
 
         if pr["corrections"]:
-            st.subheader(f"Corrections ({len(pr['corrections'])})")
+            st.subheader(f"Corrections ({n_corrections})")
             for corr in pr["corrections"]:
                 sn = corr["scene_number"]
                 heading = corr["heading"] or "untitled"
@@ -627,8 +647,9 @@ with tab_editor:
                         node = entry.get("node", "?")
                         detail = entry.get("detail", "")
 
-                        if node == "fixer":
-                            st.markdown(f"**Fixer** — attempt {entry.get('attempt', '?')}")
+                        if node in ("fixer", "audit_fixer"):
+                            label = "Audit Fixer" if node == "audit_fixer" else "Fixer"
+                            st.markdown(f"**{label}** — attempt {entry.get('attempt', '?')}")
                             col_before, col_after = st.columns(2)
                             with col_before:
                                 st.caption("Before (broken)")
@@ -638,6 +659,13 @@ with tab_editor:
                                 st.json(entry.get("after", {}))
                             if entry.get("reason"):
                                 st.caption(f"Reason: {entry['reason']}")
+                        elif node == "audit" and entry.get("findings"):
+                            st.markdown(f"**Audit** — {entry.get('error_count', 0)} error(s), {entry.get('warning_count', 0)} warning(s)")
+                            for f in entry["findings"]:
+                                icon = "🔴" if f.get("severity") == "error" else "🟡"
+                                st.markdown(f"{icon} **{f.get('check', '?')}** — {f.get('detail', '')}")
+                                if f.get("suggestion"):
+                                    st.caption(f"Suggestion: {f['suggestion']}")
                         elif entry.get("error"):
                             st.markdown(f"**{node}** — {detail}")
                             st.code(entry["error"], language="text")
@@ -646,6 +674,16 @@ with tab_editor:
                         st.divider()
         else:
             st.success("No corrections needed — all scenes passed validation cleanly.")
+
+        warnings_list = pr.get("warnings", [])
+        if warnings_list:
+            st.subheader(f"Warnings ({n_warnings})")
+            st.caption("These items did not block the pipeline but may need human review.")
+            for w in warnings_list:
+                sn_label = f"Scene {w['scene_number']}" if w.get("scene_number") else ""
+                check = w.get("check", "unknown")
+                detail = w.get("detail", "")
+                st.warning(f"**{check}** {f'({sn_label})' if sn_label else ''} — {detail}")
 
         st.divider()
 

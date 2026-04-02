@@ -106,6 +106,26 @@ def call_fix_llm_with_usage(
         return call_llm_with_usage(FALLBACK_MODEL, user_msg, system_prompt=fix_system)
 
 
+def call_audit_llm_with_usage(
+    user_text: str,
+    system_prompt: str,
+    response_model: type[BaseModel],
+) -> tuple[BaseModel, dict[str, Any]]:
+    """Structured-output call for auditor agents, with primary→fallback."""
+    try:
+        return call_llm_with_usage(
+            PRIMARY_MODEL, user_text,
+            system_prompt=system_prompt,
+            response_model=response_model,
+        )
+    except (APIStatusError, Exception):
+        return call_llm_with_usage(
+            FALLBACK_MODEL, user_text,
+            system_prompt=system_prompt,
+            response_model=response_model,
+        )
+
+
 def _build_fix_system_prompt(original_system: str) -> str:
     return (
         "You are a Narrative Graph Repair Assistant. The scene graph JSON failed validation.\n\n"

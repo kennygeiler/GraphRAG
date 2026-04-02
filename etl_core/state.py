@@ -14,9 +14,11 @@ class ETLState(TypedDict, total=False):
     # Working data
     current_json: dict[str, Any]
     retry_count: int
+    audit_retry_count: int
 
     # Observability
     audit_trail: list[dict[str, Any]]
+    warnings: list[dict[str, Any]]
     total_tokens: int
     total_cost: float
 
