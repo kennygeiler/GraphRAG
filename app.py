@@ -457,7 +457,7 @@ if _PIPELINE_ENABLED:
         st.header("Pipeline")
         st.caption(
             "Upload a Final Draft (.fdx) screenplay then run the full extraction pipeline. "
-            "The Editor Agent monitors every scene: **extract → validate → fix** (up to 3 retries)."
+            "The Editor Agent monitors every scene: **extract → validate → fix → audit**."
         )
 
         _up = st.file_uploader(
@@ -469,6 +469,13 @@ if _PIPELINE_ENABLED:
         if _up is not None:
             _TARGET_FDX.write_bytes(_up.getvalue())
             st.success(f"Saved **{_TARGET_FDX.name}** ({len(_up.getvalue()):,} bytes)")
+
+        _enable_audit = st.checkbox(
+            "Enable LLM auditors (Quote Fidelity, Completeness, Attribution)",
+            value=True,
+            help="Adds 3 AI auditor calls per scene (~30 s extra). Uncheck for a faster run with deterministic checks only.",
+            key="pipeline_enable_audit",
+        )
 
         if st.button(
             "Run Pipeline",
@@ -518,8 +525,11 @@ if _PIPELINE_ENABLED:
 
                 if raw_scenes:
                     # Stage 3: Extract scenes (the big loop)
-                    pipe_status.update(label="Stage 3 — Extracting scenes…", state="running")
                     total = len(raw_scenes)
+                    pipe_status.update(
+                        label=f"Stage 3 — Extracting 0/{total} scenes (each takes ~30-60 s with auditors)…",
+                        state="running",
+                    )
                     all_entries: list[dict[str, Any]] = []
                     all_audit: list[dict[str, Any]] = []
                     all_warnings: list[dict[str, Any]] = []
@@ -527,10 +537,14 @@ if _PIPELINE_ENABLED:
                     cum_tokens = 0
                     cum_cost = 0.0
                     failed_count = 0
+                    done_count = 0
 
                     for result in extract_scenes(
-                        raw_scenes, system_prompt, lexicon_ids=lexicon_ids,
+                        raw_scenes, system_prompt,
+                        lexicon_ids=lexicon_ids,
+                        enable_audit=_enable_audit,
                     ):
+                        done_count += 1
                         frac = 0.10 + 0.85 * (result.index / total)
                         status_icon = {
                             "skip": "⏭️", "empty": "⬜", "ok": "✅",
@@ -539,6 +553,10 @@ if _PIPELINE_ENABLED:
                         progress.progress(
                             frac,
                             text=f"Scene {result.index}/{total} — {result.status}",
+                        )
+                        pipe_status.update(
+                            label=f"Stage 3 — Extracted {done_count}/{total} scenes…",
+                            state="running",
                         )
                         msg = (
                             f"{status_icon} Scene **{result.scene_number}** "

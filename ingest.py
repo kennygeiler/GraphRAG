@@ -179,6 +179,7 @@ def extract_scenes(
     *,
     existing_by_num: dict[int, dict[str, Any]] | None = None,
     lexicon_ids: set[str] | None = None,
+    enable_audit: bool = True,
 ) -> Iterator[SceneResult]:
     """Yield one :class:`SceneResult` per scene.
 
@@ -219,6 +220,7 @@ def extract_scenes(
             graph, audit_entries, pipe_err, telem, pipe_warnings = run_extraction_pipeline(
                 sn, user_text, system_prompt,
                 lexicon_ids=lexicon_ids,
+                enable_audit=enable_audit,
             )
             if pipe_err:
                 raise RuntimeError(pipe_err)

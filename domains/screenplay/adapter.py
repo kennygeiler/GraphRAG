@@ -42,7 +42,7 @@ def _audit_llm(
     return run_audits(graph_json, raw_text, call_audit_llm_with_usage)
 
 
-def get_bundle(*, lexicon_ids: set[str] | None = None) -> DomainBundle:
+def get_bundle(*, lexicon_ids: set[str] | None = None, enable_audit: bool = True) -> DomainBundle:
     ids = lexicon_ids or set()
 
     def _business_rules(
@@ -57,5 +57,5 @@ def get_bundle(*, lexicon_ids: set[str] | None = None) -> DomainBundle:
         business_rules=_business_rules,
         extract_llm=_extract_llm,
         fix_llm=_fix_llm,
-        audit_llm=_audit_llm,
+        audit_llm=_audit_llm if enable_audit else None,
     )
