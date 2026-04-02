@@ -13,7 +13,6 @@ class ETLState(TypedDict, total=False):
 
     # Working data
     current_json: dict[str, Any]
-    error_logs: list[str]
     retry_count: int
 
     # Observability

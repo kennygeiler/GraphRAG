@@ -7,7 +7,7 @@ never imports from ``domains.*`` or ``schema``.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Literal
 
@@ -34,9 +34,6 @@ class DomainBundle:
 
     fix_llm: Callable[[dict[str, Any], str, str, str], tuple[BaseModel, dict[str, Any]]]
     """(bad_json, error_text, system_prompt, raw_text) → (fixed model, usage_dict)."""
-
-    system_prompt_fn: Callable[..., str] = field(default=lambda: "")
-    """Returns the system prompt; called with no args (or keyword args) by the engine."""
 
 
 def _ts() -> str:

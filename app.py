@@ -14,8 +14,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-import hitl
-
 from agent import ask_narrative_mri
 from domains.screenplay.adapter import get_bundle as _screenplay_bundle
 from etl_core.errors import MaxRetriesError
@@ -465,7 +463,6 @@ with st.sidebar:
 _tab_labels = [
     "🛠️ Engine Room",
     "Narrative Timeline",
-    "Human-in-the-Loop validation",
     "Ask the graph",
     "AI Audit Log",
 ]
@@ -475,11 +472,10 @@ if _PIPELINE_ENGINE_ENABLED:
 _tabs = st.tabs(_tab_labels)
 tab_engine_room = _tabs[0]
 tab_timeline = _tabs[1]
-tab_hitl = _tabs[2]
-tab_chat = _tabs[3]
-tab_audit = _tabs[4]
+tab_chat = _tabs[2]
+tab_audit = _tabs[3]
 if _PIPELINE_ENGINE_ENABLED:
-    tab_engine = _tabs[5]
+    tab_engine = _tabs[4]
 
 with tab_engine_room:
     st.header("🛠️ Engine Room")
@@ -566,147 +562,6 @@ with tab_timeline:
     st.divider()
     _render_power_shift(top_chars, _act_matrix, _act_bounds)
     _protagonist_regression_warning(_act_matrix)
-
-with tab_hitl:
-    st.header("Human-in-the-Loop validation")
-    st.caption(
-        "Pick a scene that is not **VERIFIED**, review the extracted nodes and edges, add missing "
-        "relationships, then **Approve as Gold** to set `Event.status = 'VERIFIED'` in Neo4j (Draft vs Gold)."
-    )
-
-    _hitl_flash = st.session_state.pop("hitl_flash", None)
-    if _hitl_flash:
-        for _line in _hitl_flash:
-            if _line.startswith("Error:"):
-                st.error(_line)
-            else:
-                st.success(_line)
-
-    drv_evt = get_driver()
-    try:
-        events_hitl = hitl.list_events_with_status(driver=drv_evt)
-    finally:
-        drv_evt.close()
-
-    unverified = [e for e in events_hitl if e.get("status") != "VERIFIED"]
-    gold_ct = sum(1 for e in events_hitl if e.get("status") == "VERIFIED")
-
-    c_m1, c_m2 = st.columns(2)
-    with c_m1:
-        st.metric("Gold (VERIFIED) scenes", gold_ct)
-    with c_m2:
-        st.metric("Pending review", len(unverified))
-
-    if not events_hitl:
-        st.warning("No :Event nodes in Neo4j. Run `neo4j_loader.py` after `ingest.py`.")
-    elif not unverified:
-        st.success("Every scene is **VERIFIED** — nothing left in the review queue.")
-    else:
-        def _hitl_opt_label(e: dict) -> str:
-            h = str(e.get("heading") or "").strip() or "—"
-            short = h if len(h) <= 52 else h[:52] + "…"
-            return f"Scene {e['number']} · {e.get('status', 'DRAFT')} — {short}"
-
-        labels_hitl = {int(e["number"]): _hitl_opt_label(e) for e in unverified}
-        pick_hitl = st.selectbox(
-            "Scene to review (not VERIFIED)",
-            options=[int(e["number"]) for e in unverified],
-            format_func=lambda n: labels_hitl.get(int(n), str(n)),
-            key="hitl_scene_picker",
-        )
-
-        drv_load = get_driver()
-        try:
-            nodes_hitl = hitl.get_scene_hitl_nodes(pick_hitl, driver=drv_load)
-            rels_hitl = hitl.get_scene_hitl_relationships(pick_hitl, driver=drv_load)
-        finally:
-            drv_load.close()
-
-        dfn_hitl = pd.DataFrame(nodes_hitl)
-        dfr_hitl = pd.DataFrame(rels_hitl)
-        if dfr_hitl.empty:
-            dfr_hitl = pd.DataFrame(
-                columns=["rel_id", "source_id", "rel_type", "target_id", "source_quote"]
-            )
-
-        dfn_baseline = dfn_hitl.copy()
-        dfr_baseline = dfr_hitl.copy()
-        rt_options = sorted(hitl.NARRATIVE_REL_TYPES)
-
-        st.subheader("Nodes in this scene")
-        if dfn_hitl.empty:
-            st.warning("No Character / Location / Prop nodes linked with `IN_SCENE` to this event.")
-        edited_nodes_hitl = st.data_editor(
-            dfn_hitl,
-            column_config={
-                "kind": st.column_config.TextColumn("Kind", disabled=True),
-                "id": st.column_config.TextColumn("ID", disabled=True),
-                "name": st.column_config.TextColumn("Name"),
-            },
-            hide_index=True,
-            use_container_width=True,
-            key=f"hitl_nodes_{pick_hitl}",
-        )
-
-        st.subheader("Relationships")
-        st.markdown(
-            "Edit quotes, **remove a row** to delete that edge, or **add a row** for a manual override "
-            "(both `source_id` and `target_id` must already appear in the node table above)."
-        )
-        edited_rels_hitl = st.data_editor(
-            dfr_hitl,
-            column_config={
-                "rel_id": st.column_config.TextColumn("Internal ID (read-only)", disabled=True),
-                "source_id": st.column_config.TextColumn("source_id"),
-                "rel_type": st.column_config.SelectboxColumn(
-                    "rel_type", options=rt_options, required=True
-                ),
-                "target_id": st.column_config.TextColumn("target_id"),
-                "source_quote": st.column_config.TextColumn("source_quote", width="large"),
-            },
-            hide_index=True,
-            use_container_width=True,
-            num_rows="dynamic",
-            key=f"hitl_rels_{pick_hitl}",
-        )
-
-        b_save, b_appr = st.columns(2)
-        with b_save:
-            if st.button("Save edits (stay Draft)", key=f"hitl_btn_save_{pick_hitl}"):
-                logs_hitl = hitl.apply_hitl_scene_edits(
-                    pick_hitl,
-                    dfn_baseline,
-                    edited_nodes_hitl,
-                    dfr_baseline,
-                    edited_rels_hitl,
-                    verify_event=False,
-                )
-                err_hitl = [x for x in logs_hitl if x.startswith("Error:")]
-                st.session_state["hitl_flash"] = logs_hitl
-                if not err_hitl:
-                    st.session_state.pop(f"hitl_nodes_{pick_hitl}", None)
-                    st.session_state.pop(f"hitl_rels_{pick_hitl}", None)
-                st.rerun()
-        with b_appr:
-            if st.button(
-                "Approve as Gold (save + VERIFIED)",
-                key=f"hitl_btn_appr_{pick_hitl}",
-                type="primary",
-            ):
-                logs_hitl = hitl.apply_hitl_scene_edits(
-                    pick_hitl,
-                    dfn_baseline,
-                    edited_nodes_hitl,
-                    dfr_baseline,
-                    edited_rels_hitl,
-                    verify_event=True,
-                )
-                err_hitl = [x for x in logs_hitl if x.startswith("Error:")]
-                st.session_state["hitl_flash"] = logs_hitl
-                if not err_hitl:
-                    st.session_state.pop(f"hitl_nodes_{pick_hitl}", None)
-                    st.session_state.pop(f"hitl_rels_{pick_hitl}", None)
-                st.rerun()
 
 with tab_chat:
     st.subheader("Ask about the script’s structure")

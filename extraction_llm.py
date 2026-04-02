@@ -1,7 +1,7 @@
-"""Shared Anthropic + instructor calls for scene extraction and fix-up.
+"""Anthropic + instructor LLM calls with telemetry (usage tracking).
 
-Also exposes ``*_with_usage`` variants that return ``(model, usage_dict)`` for
-``etl_core`` telemetry integration.
+All public functions return ``(parsed_model, usage_dict)`` so ``etl_core``
+can accumulate token counts and cost.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Any
 import instructor
 from anthropic import Anthropic, APIStatusError
 from instructor.core.exceptions import InstructorRetryException
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from schema import SceneGraph
 
@@ -39,13 +39,11 @@ def _ensure_clients() -> tuple[Anthropic, Any]:
 
 
 def _get_anthropic_client() -> Any:
-    """Return the instructor-wrapped client (backward compat)."""
     _, client = _ensure_clients()
     return client
 
 
 def _usage_dict(model: str, completion: Any) -> dict[str, Any]:
-    """Extract a usage dict from an Anthropic Message (raw or completion)."""
     usage = getattr(completion, "usage", None)
     if usage is None:
         return {"model": model, "input_tokens": 0, "output_tokens": 0}
@@ -56,25 +54,6 @@ def _usage_dict(model: str, completion: Any) -> dict[str, Any]:
     }
 
 
-def call_llm(model: str, prompt: str, *, system_prompt: str) -> SceneGraph:
-    """Run one structured-output completion."""
-    client = _get_anthropic_client()
-    try:
-        return client.messages.create(
-            model=model,
-            max_tokens=_MAX_TOKENS,
-            temperature=0,
-            system=system_prompt,
-            messages=[{"role": "user", "content": prompt}],
-            response_model=SceneGraph,
-            max_retries=1,
-        )
-    except APIStatusError:
-        raise
-    except InstructorRetryException:
-        raise
-
-
 def call_llm_with_usage(
     model: str,
     prompt: str,
@@ -82,7 +61,7 @@ def call_llm_with_usage(
     system_prompt: str,
     response_model: type[BaseModel] = SceneGraph,
 ) -> tuple[BaseModel, dict[str, Any]]:
-    """Like ``call_llm`` but returns ``(parsed_model, usage_dict)``."""
+    """Structured-output completion returning ``(parsed_model, usage_dict)``."""
     client = _get_anthropic_client()
     try:
         result, completion = client.messages.create_with_completion(
@@ -101,49 +80,15 @@ def call_llm_with_usage(
         raise
 
 
-def call_llm_primary_fallback(user_text: str, *, system_prompt: str) -> SceneGraph:
-    """Primary model with Haiku fallback (same behavior as legacy ingest)."""
-    try:
-        return call_llm(PRIMARY_MODEL, user_text, system_prompt=system_prompt)
-    except ValidationError:
-        raise
-    except APIStatusError:
-        print("⚠️ Primary model request failed (see error above). Retrying with Haiku...", flush=True)
-        return call_llm(FALLBACK_MODEL, user_text, system_prompt=system_prompt)
-    except Exception as e:
-        print(
-            f"⚠️ Primary model failed ({type(e).__name__}: {e}). Retrying with Haiku...",
-            flush=True,
-        )
-        return call_llm(FALLBACK_MODEL, user_text, system_prompt=system_prompt)
-
-
 def call_llm_primary_fallback_with_usage(
     user_text: str,
     system_prompt: str,
 ) -> tuple[BaseModel, dict[str, Any]]:
-    """Primary→Haiku fallback, returning ``(model, usage_dict)`` for telemetry."""
+    """Primary model with Haiku fallback, returning ``(model, usage_dict)``."""
     try:
         return call_llm_with_usage(PRIMARY_MODEL, user_text, system_prompt=system_prompt)
     except (APIStatusError, Exception):
         return call_llm_with_usage(FALLBACK_MODEL, user_text, system_prompt=system_prompt)
-
-
-def call_fix_llm(
-    bad_graph: dict[str, Any],
-    validation_error: str,
-    *,
-    system_prompt: str,
-    user_text: str,
-) -> SceneGraph:
-    """Fixer agent: receives invalid graph JSON + error text; returns a corrected SceneGraph."""
-    fix_system = _build_fix_system_prompt(system_prompt)
-    user_msg = _build_fix_user_msg(bad_graph, validation_error, user_text)
-    try:
-        return call_llm(PRIMARY_MODEL, user_msg, system_prompt=fix_system)
-    except APIStatusError:
-        print("⚠️ Fixer primary failed; retrying with Haiku...", flush=True)
-        return call_llm(FALLBACK_MODEL, user_msg, system_prompt=fix_system)
 
 
 def call_fix_llm_with_usage(

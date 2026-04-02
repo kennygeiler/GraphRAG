@@ -12,7 +12,6 @@ Screenplay **GraphRAG**: `.fdx` → JSON → **Neo4j** (`Character`, `Location`,
 |-----|---------|
 | **Engine Room** | Live self-healing ETL demo: paste text → extract→validate→fix via `etl_core` LangGraph engine; `st.metric` for tokens/cost; hallucination audit log |
 | **Narrative Timeline** | Momentum line (rolling heat), Payoff Matrix (long-gap props), Power shift (top 5 × 3 acts), protagonist regression warning |
-| **Human-in-the-Loop** | Non-`VERIFIED` scenes → edit graph → approve |
 | **Ask the graph** | Natural language → Cypher (`agent.py`) |
 | **AI Audit Log** | File-based `extraction_audit.jsonl` viewer (written by `ingest.py`) |
 | **Pipeline Engine** | Wipe DB/JSONs, upload `.fdx`, run parser → lexicon → ingest → loader with logs (hidden on cloud) |

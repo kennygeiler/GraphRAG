@@ -20,7 +20,8 @@
 |------|--------|
 | Graph load | `neo4j_loader.py`, `schema.py` |
 | Analytics | `metrics.py` |
-| UI | `app.py`, `hitl.py`, `agent.py` |
+| UI | `app.py`, `agent.py` |
+| ETL engine | `etl_core/graph_engine.py`, `domains/screenplay/adapter.py` |
 | Extract | `ingest.py`, `lexicon.py`, `parser.py` |
 
 ## When you finish a milestone

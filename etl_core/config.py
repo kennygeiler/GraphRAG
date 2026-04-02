@@ -1,4 +1,4 @@
-"""Environment bootstrap: LangSmith tracing + Anthropic keys."""
+"""Environment bootstrap: LangSmith tracing."""
 
 from __future__ import annotations
 
@@ -6,13 +6,6 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-
-_LANGSMITH_VARS = (
-    "LANGCHAIN_TRACING_V2",
-    "LANGCHAIN_ENDPOINT",
-    "LANGCHAIN_API_KEY",
-    "LANGCHAIN_PROJECT",
-)
 
 
 def load_env(dotenv_path: str | Path | None = None) -> None:
@@ -33,11 +26,3 @@ def enable_langsmith() -> bool:
         os.environ.setdefault("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
         os.environ.setdefault("LANGCHAIN_PROJECT", "narrative-mri")
     return tracing and has_key
-
-
-def require_anthropic_key() -> str:
-    load_env()
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        raise EnvironmentError("ANTHROPIC_API_KEY not set in environment or .env")
-    return key

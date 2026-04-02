@@ -108,7 +108,7 @@ wide-layout streamlit. main analytics: **narrative timeline**.
 | **payoff matrix** | long-horizon props: first intro vs last `USES` / `CONFLICTS_WITH` separated by **> 10** scene numbers (drops noise). |
 | **power shift** | passivity index (in / total on `CONFLICTS_WITH` + `USES` in act windows) for **top 5** characters by interaction volume. **`st.warning`** if configured protagonist (**`zev`** in code) is **more** passive in act 3 than act 1. |
 
-other tabs: **engine room** (live self-healing ETL demo — paste text, watch extract→validate→fix with token/cost metrics), **human-in-the-loop** (`hitl.py`), **ask the graph** (`agent.py`), **ai audit log**, **pipeline engine** (local `uv` chain — hidden in cloud when `DISABLE_PIPELINE_ENGINE=1`).
+other tabs: **engine room** (live self-healing ETL demo — paste text, watch extract→validate→fix with token/cost metrics), **ask the graph** (`agent.py`), **ai audit log**, **pipeline engine** (local `uv` chain — hidden in cloud when `DISABLE_PIPELINE_ENGINE=1`).
 
 ## quick start
 
@@ -216,7 +216,6 @@ GraphRAG/
 ├── schema.py                  # pydantic graph contract
 ├── metrics.py                 # cypher analytics
 ├── app.py                     # streamlit: engine room + narrative charts
-├── hitl.py                    # draft vs gold scene review
 ├── agent.py                   # nl → cypher (optional)
 ├── Dockerfile
 ├── docker-compose.yml         # app → external neo4j / aura
