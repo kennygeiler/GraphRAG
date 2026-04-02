@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,9 @@ PROTAGONIST_ID = "zev"
 
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _TARGET_FDX = _PROJECT_ROOT / "target_script.fdx"
+PIPELINE_EFFICIENCY_LOG = _PROJECT_ROOT / "pipeline_efficiency_log.json"
+# Bump when you ship pipeline/agent optimizations (tracked in efficiency tab).
+AGENT_OPTIMIZATION_VERSION = 0
 _PIPELINE_JSON_NAMES = (
     "raw_scenes.json",
     "master_lexicon.json",
@@ -47,6 +51,25 @@ def _env_truthy(name: str) -> bool:
 
 
 _PIPELINE_ENABLED = not _env_truthy("DISABLE_PIPELINE")
+
+
+def _load_efficiency_log() -> list[dict[str, Any]]:
+    if not PIPELINE_EFFICIENCY_LOG.is_file():
+        return []
+    try:
+        raw = json.loads(PIPELINE_EFFICIENCY_LOG.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    return raw if isinstance(raw, list) else []
+
+
+def _append_efficiency_run(entry: dict[str, Any]) -> None:
+    rows = _load_efficiency_log()
+    rows.append(entry)
+    PIPELINE_EFFICIENCY_LOG.write_text(
+        json.dumps(rows, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
 # ---------------------------------------------------------------------------
 # Neo4j dashboard caching
@@ -436,7 +459,7 @@ with st.sidebar:
 _tab_labels: list[str] = []
 if _PIPELINE_ENABLED:
     _tab_labels.append("Pipeline")
-_tab_labels += ["Editor Agent", "Dashboard", "Investigate"]
+_tab_labels += ["Editor Agent", "Pipeline Efficiency Tracking", "Dashboard", "Investigate"]
 
 _tabs = st.tabs(_tab_labels)
 _ti = 0
@@ -444,6 +467,7 @@ _ti = 0
 if _PIPELINE_ENABLED:
     tab_pipeline = _tabs[_ti]; _ti += 1
 tab_editor = _tabs[_ti]; _ti += 1
+tab_efficiency = _tabs[_ti]; _ti += 1
 tab_dashboard = _tabs[_ti]; _ti += 1
 tab_investigate = _tabs[_ti]; _ti += 1
 
@@ -674,6 +698,21 @@ For an 86-scene script: **~$0.85 fast** or **~$2.50 full audit**.
                         "tokens": cum_tokens,
                         "cost": cum_cost,
                     }
+                    try:
+                        _append_efficiency_run({
+                            "ts": datetime.now(timezone.utc).isoformat(),
+                            "scenes_extracted": len(all_entries),
+                            "total_scenes": total,
+                            "corrections": len(corrections),
+                            "warnings": len(all_warnings),
+                            "total_tokens": cum_tokens,
+                            "estimated_cost": round(cum_cost, 6),
+                            "agent_optimization_version": AGENT_OPTIMIZATION_VERSION,
+                            "failed_scenes": failed_count,
+                            "llm_auditors_enabled": bool(_enable_audit),
+                        })
+                    except OSError:
+                        pass
 
             pr = st.session_state.get("pipeline_results")
             if pr:
@@ -802,6 +841,76 @@ with tab_editor:
                             f"Loaded **{loaded}** scenes into Neo4j. Dashboard refreshed."
                         )
                         st.rerun()
+
+
+# ===================================================================
+# TAB: Pipeline Efficiency Tracking
+# ===================================================================
+
+with tab_efficiency:
+    st.header("Pipeline Efficiency Tracking")
+    st.caption(
+        "Each completed pipeline run is appended to `pipeline_efficiency_log.json` "
+        f"(optimization version **{AGENT_OPTIMIZATION_VERSION}** — bump `AGENT_OPTIMIZATION_VERSION` in `app.py` when you ship improvements)."
+    )
+    rows = _load_efficiency_log()
+    if not rows:
+        st.info("No runs logged yet. Complete a pipeline run in the **Pipeline** tab to record metrics.")
+    else:
+        display: list[dict[str, Any]] = []
+        for r in reversed(rows):
+            if not isinstance(r, dict):
+                continue
+            ext = r.get("scenes_extracted", 0)
+            tot = r.get("total_scenes", 0)
+            display.append({
+                "Run (UTC)": r.get("ts", "")[:19].replace("T", " "),
+                "Scenes extracted": f"{ext} / {tot}" if tot else str(ext),
+                "Corrections": r.get("corrections", 0),
+                "Warnings": r.get("warnings", 0),
+                "Total tokens": r.get("total_tokens", 0),
+                "Estimated cost ($)": r.get("estimated_cost", 0.0),
+                "Agent opt. version": r.get("agent_optimization_version", 0),
+                "Auditors on": "yes" if r.get("llm_auditors_enabled") else "no",
+                "Failed scenes": r.get("failed_scenes", 0),
+            })
+        df = pd.DataFrame(display)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+        costs = [float(r.get("estimated_cost", 0) or 0) for r in rows if isinstance(r, dict)]
+        tokens = [int(r.get("total_tokens", 0) or 0) for r in rows if isinstance(r, dict)]
+        if len(costs) >= 2:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                y=costs,
+                mode="lines+markers",
+                name="Estimated cost ($)",
+                line=dict(color="#FF4B4B"),
+            ))
+            fig.update_layout(
+                title="Estimated cost per run (chronological)",
+                xaxis_title="Run index",
+                yaxis_title="USD",
+                height=320,
+                margin=dict(l=40, r=20, t=50, b=40),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            fig2 = go.Figure()
+            fig2.add_trace(go.Scatter(
+                y=tokens,
+                mode="lines+markers",
+                name="Total tokens",
+                line=dict(color="#1f77b4"),
+            ))
+            fig2.update_layout(
+                title="Total tokens per run (chronological)",
+                xaxis_title="Run index",
+                yaxis_title="Tokens",
+                height=320,
+                margin=dict(l=40, r=20, t=50, b=40),
+            )
+            st.plotly_chart(fig2, use_container_width=True)
 
 
 # ===================================================================
