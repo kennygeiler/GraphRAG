@@ -2,7 +2,7 @@
 
 ## Read first
 
-1. **`strategy.md`** — Architecture, metric definitions, dashboard behavior, strict rules for changes.
+1. **`strategy.md`** — Architecture, metric definitions, Streamlit app behavior, strict rules for changes.
 2. **`MEMORY.md`** — Short current-state snapshot (tabs, metrics, pipeline).
 3. **`.cursorrules`** — Cursor-local summary; should stay consistent with `strategy.md`.
 
@@ -21,7 +21,7 @@
 | Sample scripts | `samples/` (`samples/README.md`); root **README** demo walkthrough |
 | Graph load | `neo4j_loader.py`, `schema.py` |
 | Analytics | `metrics.py` |
-| UI | `app.py`, `agent.py`, `cleanup_review.py`, `pipeline_runs.py`, `reconcile.py`, `lead_resolution.py`, `data_out.py` |
+| UI | `app.py`, `cleanup_review.py`, `pipeline_runs.py`, `reconcile.py`, `data_out.py` |
 | ETL engine | `etl_core/graph_engine.py`, `domains/screenplay/adapter.py` |
 | Extract | `ingest.py` (exports `extract_scenes` generator + `SceneResult`), `lexicon.py`, `parser.py` |
 

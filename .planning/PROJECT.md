@@ -2,13 +2,13 @@
 
 ## What This Is
 
-**ScriptRAG** is a GraphRAG system for screenplays: Final Draft (`.fdx`) is parsed into JSON, a self-healing LLM pipeline extracts a validated scene graph (Pydantic + instructor) with **verbatim `source_quote`** on narrative edges, and **Neo4j** stores `Character`, `Location`, `Prop`, and `Event` nodes with structural and narrative relationships. A **Streamlit** app runs the pipeline, cleanup review, **reconciliation** (`reconcile.py`), efficiency tracking, structural metrics dashboards (including **structural load** MET-01), and natural-language graph investigation. **Primary lead** and cohort sizing for role-dependent charts come from graph analysis with optional **`SCRIPTRAG_*`** env overrides (`lead_resolution.py`).
+**ScriptRAG** is a GraphRAG system for screenplays: Final Draft (`.fdx`) is parsed into JSON, a self-healing LLM pipeline extracts a validated scene graph (Pydantic + instructor) with **verbatim `source_quote`** on narrative edges, and **Neo4j** stores `Character`, `Location`, `Prop`, and `Event` nodes with structural and narrative relationships. A **Streamlit** app runs the pipeline, verify (HITL), **reconciliation** (`reconcile.py`), **Data out** (recipe Cypher + CSV), and efficiency tracking. Structural analytics (including **structural load** MET-01) live in **`metrics.py`** / CLI. Optional **`SCRIPTRAG_*`** + **`lead_resolution.py`** remain for programmatic use.
 
 **Audience:** Writers, producers, and developers analyzing narrative “physics” (agency, friction, props, conflict structure)—not vibes without evidence.
 
 ## Core Value
 
-End-to-end, **evidence-backed** structural analysis of a screenplay in a queryable graph—with a working pipeline from upload → validated extraction → Neo4j → metrics and investigation.
+End-to-end, **evidence-backed** structural analysis of a screenplay in a queryable graph—with a working pipeline from upload → validated extraction → Neo4j → exports and **metrics.py** analytics.
 
 ## Current milestones
 
@@ -30,14 +30,13 @@ End-to-end, **evidence-backed** structural analysis of a screenplay in a queryab
 - ✓ **Lexicon + per-scene extraction** with self-healing LangGraph ETL (`etl_core`, `ingest.py`, `domains/screenplay/`) — existing
 - ✓ **Neo4j load** with merge semantics and `source_quote` on narrative rels (`neo4j_loader.py`) — existing
 - ✓ **Metrics layer** (passivity, scene heat, momentum, payoff props, act buckets, power shift, structural load MET-01, etc.) — existing (`metrics.py`)
-- ✓ **Streamlit product** — Pipeline, Cleanup Review, **Reconcile**, Efficiency Tracking, Dashboard, Investigate (`app.py`, `cleanup_review.py`, `reconcile.py`, `agent.py`, `pipeline_runs.py`, `lead_resolution.py`) — existing
+- ✓ **Streamlit product** — Pipeline, Verify, **Reconcile**, **Data out**, Efficiency Tracking (`app.py`, `cleanup_review.py`, `reconcile.py`, `data_out.py`, `pipeline_runs.py`) — existing; **Dashboard / Investigate removed** (2026-04-03 product trim).
 - ✓ **Pipeline run telemetry** as `:PipelineRun` nodes — existing
-- ✓ **Ask-the-graph** NL → Cypher path — existing (`agent.py`)
-- ✓ **Analysis-derived primary lead + env overrides** — `lead_resolution.py`, `SCRIPTRAG_PRIMARY_LEAD_ID` / `SCRIPTRAG_TOP_CHARACTERS`, Dashboard regression + sidebar (Phase 1, 2026-04-03).
+- ✓ **Programmatic lead helpers** — `lead_resolution.py`, optional `SCRIPTRAG_*` (not used by Streamlit UI after trim).
 - ✓ **Script-agnostic operator copy** — no hardcoded production character IDs in `app.py` UI strings; docs aligned (`MEMORY.md`, `strategy.md`).
 - ✓ **Empty / partial graph hardening (REL-01)** — explicit empty states and safe metric paths when Neo4j is missing or incomplete (Phase 2, 2026-04-03).
 - ✓ **Reconciliation for operators (REC-01)** — `reconcile.py` CLI + Streamlit tab; documented merge semantics (Phase 3, 2026-04-03).
-- ✓ **Structural load / production signal (MET-01)** — `get_structural_load_snapshot`, Dashboard + CLI (Phase 4, 2026-04-04).
+- ✓ **Structural load / production signal (MET-01)** — `get_structural_load_snapshot`, CLI (Phase 4, 2026-04-04).
 - ✓ **Data out / manipulable sink (OUT-01)** — `data_out.py`, **Data out** tab: schema card, recipe Cypher, CSV exports (v1.2 Phase 8, 2026-04-03).
 - ✓ **HITL + observability copy (FLOW-01)** — Cleanup Review HITL banner; Efficiency observability caption (v1.2 Phase 9, 2026-04-03).
 - ✓ **Demo layout flag (DEMO-01)** — `SCRIPTRAG_DEMO_LAYOUT` tab order + copy (v1.2 Phase 10, 2026-04-03).

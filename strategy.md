@@ -8,12 +8,12 @@
 
 ## 1. What this project is
 
-**ScriptRAG** is a **GraphRAG** system for screenplays: it turns structured script data into a **Neo4j** knowledge graph and exposes **structural "physics"** (agency, friction, prop load) through metrics and a **Streamlit** dashboard with a self-healing AI extraction pipeline.
+**ScriptRAG** is a **GraphRAG** system for screenplays: it turns structured script data into a **Neo4j** knowledge graph and exposes **structural "physics"** (agency, friction, prop load) through **`metrics.py`** / CLI and a **Streamlit** app with a self-healing AI extraction pipeline (**Pipeline**, **Verify**, **Reconcile**, **Data out**, **Pipeline Efficiency Tracking**).
 
 **Core philosophy — "ruthless structuralism":**  
 We do not infer vibes from prose alone. We map **narrative physics**: who acts on whom, where conflict is explicit, how passive a character is under a defined graph metric, and whether props earn their place. Evidence lives on edges as **verbatim `source_quote`** text from the script.
 
-**Reference production:** **Cinema Four** (~86 scenes) is the script used most in development. The **pipeline and UI are script-agnostic**: any `.fdx` → same JSON → Neo4j shape; **primary lead** and cohort size come from **graph analysis** with optional **`SCRIPTRAG_*`** env overrides (`lead_resolution.py`), not hardcoded character names in `app.py`.
+**Reference production:** **Cinema Four** (~86 scenes) is the script used most in development. The **pipeline and UI are script-agnostic**: any `.fdx` → same JSON → Neo4j shape. Optional **`SCRIPTRAG_*`** env overrides (`lead_resolution.py`) remain available for **programmatic** callers (not used by the Streamlit UI today).
 
 ---
 
@@ -26,7 +26,7 @@ We do not infer vibes from prose alone. We map **narrative physics**: who acts o
 | Extract | `validated_graph.json` (per-scene `SceneGraph`) | `ingest.py` (exports `extract_scenes()` generator; checkpoints each scene; `--fresh` to wipe) |
 | Load | Neo4j nodes & relationships | `neo4j_loader.py` (exports `load_entries()` for in-memory data) |
 | Analyze | Passivity, heat, Chekhov, QA queries | `metrics.py`, `reconcile.py` |
-| Experience | Pipeline + Cleanup + Reconcile + efficiency + Dashboard + Investigate | `app.py`, `agent.py`, `pipeline_runs.py`, `cleanup_review.py`, `reconcile.py`, `lead_resolution.py` |
+| Experience | Pipeline + Verify + Reconcile + Data out + efficiency | `app.py`, `pipeline_runs.py`, `cleanup_review.py`, `reconcile.py`, `data_out.py` |
 
 **Graph model (Neo4j):**
 
@@ -55,18 +55,15 @@ Use this as a checklist; flip items when reality changes.
 - [x] **Neo4j loader** (merge events, entities, `IN_SCENE`, narrative edges with quotes).
 - [x] **Metrics layer** (`metrics.py`): passivity (global and windowed), scene heat, load-bearing props, possessed-unused, Act I→III Chekhov-style audit, scene inspector quotes, character `IN_SCENE` counts.
 - [x] **Scene heat refinement:** numerator = **distinct unordered conflict pairs** in-scene (not raw `CONFLICTS_WITH` edge count) to reduce dialogue-bloat skew.
-- [x] **Streamlit dashboard** (`app.py`): **ScriptRAG** — **Pipeline** (upload FDX, in-process extraction; persists **:PipelineRun**; self-healing **corrections** shown here), **Verify** (warnings with guidance + approve/decline; approve & load to Neo4j), **Reconcile** (`reconcile.py` scan + optional confirmed merges; ghosts + fuzzy Character/Location pairs), **Pipeline Efficiency Tracking** (table from Neo4j; telemetry token/cost), **Dashboard** (structural load MET-01, momentum, payoff matrix, power shift, X/N scenes, **primary-lead** regression warning), **Investigate** (ask the graph).
+- [x] **Streamlit app** (`app.py`): **ScriptRAG** — **Pipeline** (upload FDX, in-process extraction; persists **:PipelineRun**; self-healing **corrections** shown here), **Verify** (warnings with guidance + approve/decline; approve & load to Neo4j), **Reconcile** (`reconcile.py` scan + optional confirmed merges; ghosts + fuzzy Character/Location pairs), **Data out** (schema, recipe Cypher, CSV), **Pipeline Efficiency Tracking** (table from Neo4j; telemetry token/cost). Section navigation uses a **horizontal radio** (not `st.tabs`) so widget reruns keep the user on the same view (e.g. **Data out** recipe query).
 - [x] **Self-healing ETL pipeline:** `etl_core` LangGraph engine (extract → validate → fix loop), `ingest.py` exports `extract_scenes()` generator, Streamlit consumes it with live per-scene progress.
-- [x] **Ask the graph** chat path (`agent.py`).
 - [x] **Utilities:** `debug_export.py` → `graph_qa_dump.json`; `qa_entities.py` → `data_health_report.json`.
 
 ### In progress / known gaps
 
-- [x] **Timeline empty states:** Narrative Timeline charts guard empty Cypher results and missing columns.
-- [x] **Full script-agnostic UI (primary lead):** Regression uses `lead_resolution` — env override `SCRIPTRAG_PRIMARY_LEAD_ID` or analysis rank #1; cohort size `SCRIPTRAG_TOP_CHARACTERS`.
-- [x] **Graph reliability (REL-01):** Dashboard `@st.cache_data` Neo4j loaders return empty shapes on connection/query errors (`logging.exception`, no `st.*` in cache). Momentum / payoff / power-shift guard DataFrame columns and character ids. **`agent.py`** builds `Neo4jGraph` / `GraphCypherQAChain` lazily (`_get_chain()`); import does not require Neo4j env at load time. **Investigate** tab wraps chat errors; **Verify** uses safe dict access on pipeline results.
+- [x] **Graph reliability (REL-01):** `@st.cache_data` Neo4j loaders for **Reconcile** / **Data out** return empty shapes on connection/query errors (`logging.exception`, no `st.*` in cache). **Verify** uses safe dict access on pipeline results.
 - [x] **Reconciliation (REC-01):** **`run_reconciliation_scan`** + **`ReconciliationScan`** in `reconcile.py`; CLI **`--scope`** + **`--dry-run`**; README **Reconciliation** section; Streamlit **Reconcile** tab (cached scan, checkbox + pair picker before **`merge_characters` / `merge_entities`**).
-- [x] **Structural load (MET-01):** **`get_structural_load_snapshot`** in `metrics.py` (narrative edge counts + entity totals + **structural load index**); Dashboard metrics row; **`metrics.py --structural-load`**.
+- [x] **Structural load (MET-01):** **`get_structural_load_snapshot`** in `metrics.py` (narrative edge counts + entity totals + **structural load index**); **`metrics.py --structural-load`**.
 
 ### Explicitly not started (roadmap)
 
@@ -82,35 +79,35 @@ These definitions are what code should implement; if code diverges, fix code or 
 |--------|------------|
 | **Passivity** | For a character: `in_degree / (in_degree + out_degree)` on **CONFLICTS_WITH** and **USES** (including incoming **USES** on **POSSESSES**'d props). `None` if no qualifying edges. Windowed variants restrict edges to scenes in `[lo, hi]` (see `get_passivity_in_scene_window`). |
 | **Scene heat** | For an `Event`: `(# of **unique unordered** entity pairs with ≥1 in-scene CONFLICTS_WITH between them, either direction) / (count of IN_SCENE links into that Event)`. Undefined heat when denominator is 0. Used in CLI (`metrics.py --heat`) and diagnostics — **not** the same formula as **narrative momentum** below. |
-| **Narrative momentum (dashboard)** | Per `Event`: `CONFLICTS_WITH / (INTERACTS_WITH + CONFLICTS_WITH)` counting in-scene typed edges among co-present entities (`get_narrative_momentum_by_scene`). UI applies a **3-scene** rolling mean (`ROLLING_SCENES` in `app.py`). |
+| **Narrative momentum** | Per `Event`: `CONFLICTS_WITH / (INTERACTS_WITH + CONFLICTS_WITH)` counting in-scene typed edges among co-present entities (`get_narrative_momentum_by_scene`). A **3-scene** rolling mean was used by the removed Streamlit chart; callers can apply the same smoothing if needed. |
 | **Payoff / long-arc props** | `get_payoff_prop_timelines`: first intro vs last `USES`/`CONFLICTS_WITH`; include if `(last − first) > PAYOFF_MIN_SCENE_GAP` (default **10**). |
 | **Power-shift cohort** | Top **K** characters by total **CONFLICTS_WITH + USES + INTERACTS_WITH** edge count, both directions (`get_top_characters_by_interaction_count`). |
-| **Act buckets (dashboard)** | **Equal thirds** of inclusive scene span `min(:Event.number)…max(:Event.number)` (`get_script_act_bounds` in `metrics.py`). Vertical markers on momentum chart at first scene of Act 2 and Act 3 when structurally distinct. |
-| **Primary-lead regression (UI)** | **Primary** = `SCRIPTRAG_PRIMARY_LEAD_ID` if set, else Character at rank **#1** by `get_top_characters_by_interaction_count(1)` (same edge mix as power-shift). If that id’s passivity in Act 3 **>** Act 1 → `st.warning` (fatal arc). If id missing from matrix or unresolved → informative message, no warning. |
+| **Act buckets** | **Equal thirds** of inclusive scene span `min(:Event.number)…max(:Event.number)` (`get_script_act_bounds` in `metrics.py`). Useful for windowed passivity and act-scoped analytics. |
+| **Primary-lead regression (legacy)** | Previously a Streamlit warning comparing Act 1 vs Act 3 passivity for a resolved primary id (`SCRIPTRAG_PRIMARY_LEAD_ID` or rank #1). **Removed from the app**; logic can still be reproduced via `metrics.py` + `lead_resolution.py` if needed. |
 | **Load-bearing props** | Props with **≥2** total **USES** or **CONFLICTS_WITH** touches (after set-dressing filter in `metrics.py`). Used in older Chekhov-style CLI audits, not the Payoff Matrix chart. |
-| **Structural load index (MET-01)** | `narrative_edge_count / max(scene_count, 1)` where **narrative edges** are relationship instances with `type(r) ∈ {INTERACTS_WITH, CONFLICTS_WITH, USES, LOCATED_IN, POSSESSES}` (both directions counted as stored in Neo4j), and **scene_count** is `count(:Event)`. Additive production-density proxy in **Dashboard** and `metrics.py --structural-load`; not a quality score. |
+| **Structural load index (MET-01)** | `narrative_edge_count / max(scene_count, 1)` where **narrative edges** are relationship instances with `type(r) ∈ {INTERACTS_WITH, CONFLICTS_WITH, USES, LOCATED_IN, POSSESSES}` (both directions counted as stored in Neo4j), and **scene_count** is `count(:Event)`. Additive production-density proxy in **`metrics.py --structural-load`**; not a quality score. |
 
 ---
 
-## 5. Dashboard map (`app.py`)
+## 5. App map (`app.py`)
 
 **Layout:** `st.set_page_config(page_title="ScriptRAG", layout="wide")`.
 
-**Top-level tabs**
+**Section navigation:** A **horizontal `st.radio`** (keyed `scriptrag_section`) lists the views below. This replaces `st.tabs()` so changing widgets inside **Data out** (recipe query, exports) does **not** snap the UI back to the first tab on rerun.
+
+**Views (typical order)**
 
 1. **Pipeline** — Upload `.fdx`, run full extraction in-process (parse → lexicon → per-scene `extract_scenes()` with live progress). Stores results in `st.session_state`. On completion, writes a **`:PipelineRun`** row (efficiency metrics; in-app telemetry). Hidden when `DISABLE_PIPELINE=1`.
 2. **Verify** — Warnings only: human-readable check title + guidance, JSON path, per-warning approve/decline. Self-healing **corrections** (fixer before/after) appear in **Pipeline**. "Approve & Load to Neo4j" calls `neo4j_loader.load_entries()` (graph wipe spares `:PipelineRun`).
-3. **Reconcile** — Optional **post-load** hygiene: ghost characters + fuzzy Character/Location pairs; optional merges (`reconcile.py`).
-4. **Data out** — Schema card, live label/relationship counts, fixed **recipe Cypher** (parameterized), CSV downloads for narrative edges / characters / events (`data_out.py`). Demos **manipulable data** after HITL load.
+3. **Reconcile** — Optional **post-load** hygiene: ghost characters + fuzzy Character/Location pairs; optional merges (`reconcile.py`). *Default order places Reconcile before Data out unless* **`SCRIPTRAG_DEMO_LAYOUT=1`** *puts Data out first.*
+4. **Data out** — Schema card, live label/relationship counts, fixed **recipe Cypher** (parameterized), CSV downloads for narrative edges / characters / events (`data_out.py`).
 5. **Pipeline Efficiency Tracking** — Reads **`:PipelineRun`** from Neo4j (telemetry tokens/cost and run metadata).
-6. **Dashboard** — X/N scenes banner, **Structural load** (MET-01: `get_structural_load_snapshot`), **Momentum** (Plotly line + area, dashed act-boundary vlines), **Payoff Matrix** (horizontal span bars for long-gap props), **Power shift** (multi-line passivity across three act buckets), primary-lead regression warning.
-7. **Investigate** — Narrative QA / Cypher path (`agent.py`).
 
-**Sidebar:** "Reload metrics" clears cache; "Nuke database" in expander for full resets. With **`SCRIPTRAG_DEMO_LAYOUT=1`**, a caption explains **demo tab order** (Cleanup → Data out → Reconcile → …).
+**Sidebar:** **Reload Neo4j cache** clears `@st.cache_data`. **Reset graph data** clears the screenplay graph in Neo4j and local pipeline JSON but keeps **:PipelineRun** rows.
 
-**Cache:** Dashboard queries use `@st.cache_data` keyed on pipeline artifact mtimes; "Reload metrics" clears cache.
+**Cache:** Reconcile scan and Data out queries use `@st.cache_data` keyed on pipeline artifact mtimes (`validated_graph.json` / `pipeline_state.json` mtimes).
 
-**Demo layout:** Optional env **`SCRIPTRAG_DEMO_LAYOUT`** — when set, tabs 3–4 become **Data out** then **Reconcile** (default production order is the reverse). **Reset dashboard data** clears the screenplay graph in Neo4j but keeps **:PipelineRun** rows.
+**Demo layout:** Optional env **`SCRIPTRAG_DEMO_LAYOUT`** — when set, **Verify → Data out → Reconcile → …** (otherwise **Verify → Reconcile → Data out → …**).
 
 ---
 
@@ -122,7 +119,7 @@ These definitions are what code should implement; if code diverges, fix code or 
 
 1. **Automated tests** — pytest (or similar) for `metrics.py` / `reconcile.py` critical paths with mocked Neo4j sessions; optional integration smoke against a disposable DB.
 2. **Repo hygiene** — explicit **LICENSE**, optional **CONTRIBUTING**, CI (lint + tests) if the project goes public.
-3. **Operator UX** — **Data out** tab (CSV exports + recipe queries); optional JSON bundle export; Prop-level reconciliation; richer efficiency / cost rollups.
+3. **Operator UX** — optional JSON bundle export; Prop-level reconciliation; richer efficiency / cost rollups.
 4. **Performance** — optional **`python-Levenshtein`** to speed `fuzzywuzzy` in `reconcile.py` (removes runtime warning).
 5. **Exploratory:** Sentiment or subtext on edges **only** with verbatim `source_quote` and secondary placement vs structural metrics (**§3**).
 
@@ -156,7 +153,7 @@ Follow these in every change unless the user explicitly overrides.
 ### When the user pivots or ships a milestone
 
 11. **Update `strategy.md`** — Adjust §3 checkboxes, §4 if metrics change, §5–§6 if UI or roadmap changes, §7 if new non-negotiables appear.
-12. **Sync `.cursorrules` and `MEMORY.md`** with dashboard/metric changes (full detail stays here).
+12. **Sync `.cursorrules` and `MEMORY.md`** with app/metric changes (full detail stays here).
 
 ---
 

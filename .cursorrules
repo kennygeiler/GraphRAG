@@ -1,6 +1,6 @@
 # Project Memory: ScriptRAG
 
-**Authoritative context:** See **`strategy.md`** in the repo root for full project state, roadmap, metric definitions, dashboard map, and strict AI rules. **Update `strategy.md` on every major milestone**; keep **`MEMORY.md`** in sync; this file stays a short mirror for Cursor.
+**Authoritative context:** See **`strategy.md`** in the repo root for full project state, roadmap, metric definitions, app map, and strict AI rules. **Update `strategy.md` on every major milestone**; keep **`MEMORY.md`** in sync; this file stays a short mirror for Cursor.
 
 **Current date:** April 2026 
 **Owner:** Kenny Geiler 
@@ -11,12 +11,12 @@
 - **Input:** `.fdx` (Final Draft) → `raw_scenes.json` → lexicon → `validated_graph.json`.
 - **Graph:** Neo4j — `Character`, `Location`, `Prop`, `Event`; `IN_SCENE` + narrative rels with quotes.
 - **Extraction:** Claude via `instructor` + Pydantic (`schema.py`). Self-healing pipeline: extract → validate → fix (up to 3 retries) via `etl_core` LangGraph engine.
-- **Dashboard (`app.py`):** **ScriptRAG** (wide layout). Tabs: **Pipeline** (incl. self-heal corrections), **Verify** (warnings + load), **Reconcile** (optional post-load hygiene), **Data out** (`data_out.py`), **Pipeline Efficiency Tracking**, **Dashboard**, **Investigate**. Neo4j reset keeps **:PipelineRun**. **REL-01:** cached loaders; lazy Neo4j in `agent.py`. **`lead_resolution.py`** + **`SCRIPTRAG_*`**.
+- **Streamlit (`app.py`):** **ScriptRAG** (wide layout). Sections (horizontal **radio**, not tabs): **Pipeline** (incl. self-heal corrections), **Verify** (warnings + load), **Reconcile**, **Data out** (`data_out.py`), **Pipeline Efficiency Tracking**. Neo4j **Reset graph data** keeps **:PipelineRun**. **REL-01:** cached loaders for Reconcile / Data out. Charts + NL→Cypher **removed**; **`metrics.py`** / CLI keep structural analytics.
 
 ## 2. Metrics (do not conflate)
 
 - **Passivity:** `in / (in + out)` on `CONFLICTS_WITH` + `USES` (incl. incoming `USES` on possessed props). High = more reactive / passive.
-- **Narrative momentum heat (Timeline chart):** Per scene, `CONFLICTS_WITH / (INTERACTS_WITH + CONFLICTS_WITH)` among co-present entities; UI smooths with **3-scene** rolling mean.
+- **Narrative momentum heat (metrics / former chart):** Per scene, `CONFLICTS_WITH / (INTERACTS_WITH + CONFLICTS_WITH)` among co-present entities; **3-scene** rolling mean was used when a chart existed in the app.
 - **Scene heat (`get_scene_heat`, CLI):** **Unique unordered conflict pairs** ÷ `IN_SCENE` count — different numerator/denominator than momentum heat.
 - **Act windows:** `get_script_act_bounds` — **equal thirds** of `min..max(:Event.number)` in Neo4j (not fixed Cinema Four scene IDs).
 
@@ -24,7 +24,7 @@
 
 - Python 3.12, **`uv`** for install/run.
 - Neo4j Python driver; **parameterized Cypher only**.
-- Streamlit + Plotly.
+- Streamlit.
 
 ## 4. Engineering norms
 

@@ -10,7 +10,7 @@
 - **CONFIG / GEN:** Analysis-derived primary lead + `SCRIPTRAG_PRIMARY_LEAD_ID` / `SCRIPTRAG_TOP_CHARACTERS`; script-agnostic operator copy (`lead_resolution.py`, `app.py`).
 - **REL-01:** Empty / partial Neo4j and skewed query shapes do not crash Streamlit metric paths.
 - **REC-01:** `reconcile.py` CLI (`--dry-run`, `--scope`) + Streamlit **Reconcile** tab; safe merge (APOC or manual rewire).
-- **MET-01:** Structural load snapshot (`get_structural_load_snapshot`), Dashboard + `metrics.py --structural-load`.
+- **MET-01:** Structural load snapshot (`get_structural_load_snapshot`), `metrics.py --structural-load` (CLI).
 
 ---
 

@@ -41,7 +41,7 @@ def _wipe_graph(tx: Any) -> None:
 
 
 def wipe_screenplay_graph_keep_pipeline_runs(driver: Any) -> None:
-    """Delete all Neo4j nodes except **:PipelineRun** (dashboard reset; efficiency history preserved)."""
+    """Delete all Neo4j nodes except **:PipelineRun** (graph reset; efficiency history preserved)."""
     with driver.session() as session:
         session.execute_write(_wipe_graph)
 

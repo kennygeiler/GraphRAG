@@ -8,15 +8,11 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from neo4j.exceptions import AuthError, Neo4jError, ServiceUnavailable
-
 load_dotenv()
 
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 
-from agent import ask_narrative_mri
 from cleanup_review import (
     apply_approved_warning_edits,
     cleanup_warning_widget_id,
@@ -27,17 +23,8 @@ from cleanup_review import (
     warning_verify_guidance,
 )
 from ingest import build_system_prompt, extract_scenes
-from lead_resolution import resolve_primary_character_id, top_characters_k
 from lexicon import build_master_lexicon
-from metrics import (
-    get_driver,
-    get_narrative_momentum_by_scene,
-    get_passivity_in_scene_window,
-    get_payoff_prop_timelines,
-    get_script_act_bounds,
-    get_structural_load_snapshot,
-    get_top_characters_by_interaction_count,
-)
+from metrics import get_driver
 from neo4j_loader import load_entries, wipe_screenplay_graph_keep_pipeline_runs
 from parser import parse_fdx_to_raw_scenes, write_raw_scenes_json
 from pipeline_runs import list_pipeline_runs, save_pipeline_run
@@ -59,9 +46,6 @@ from data_out import (
 )
 
 _log = logging.getLogger(__name__)
-
-ROLLING_SCENES = 3
-PAYOFF_MIN_SCENE_GAP = 10
 
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _TARGET_FDX = _PROJECT_ROOT / "target_script.fdx"
@@ -120,7 +104,7 @@ def _persist_pipeline_run(
 
 
 # ---------------------------------------------------------------------------
-# Neo4j dashboard caching
+# Neo4j cache stamp (pipeline JSON mtimes — invalidates cached graph reads)
 # ---------------------------------------------------------------------------
 
 def _neo4j_dashboard_cache_stamp() -> tuple[float, float]:
@@ -134,11 +118,6 @@ def _neo4j_dashboard_cache_stamp() -> tuple[float, float]:
             return 0.0
 
     return (_mt(vg), _mt(ps))
-
-
-def _act_bounds_six(b: dict[str, Any]) -> tuple[int, int, int, int, int, int]:
-    (a1l, a1h), (a2l, a2h), (a3l, a3h) = b["act1"], b["act2"], b["act3"]
-    return (int(a1l), int(a1h), int(a2l), int(a2h), int(a3l), int(a3h))
 
 
 def _wipe_dashboard_neo4j_keep_pipeline_runs() -> None:
@@ -218,170 +197,6 @@ def _render_pipeline_corrections(corrections: list[dict[str, Any]]) -> None:
 # ---------------------------------------------------------------------------
 # Neo4j cached queries
 # ---------------------------------------------------------------------------
-
-@st.cache_data(ttl=120, show_spinner="Loading narrative momentum…")
-def _cached_momentum_rows(_artifact_stamp: tuple[float, float]) -> list[dict[str, Any]]:
-    del _artifact_stamp
-    drv = get_driver()
-    try:
-        try:
-            return get_narrative_momentum_by_scene(driver=drv)
-        except (Neo4jError, ServiceUnavailable, AuthError, OSError):
-            _log.exception("Cached narrative momentum load failed")
-            return []
-        except Exception:
-            _log.exception("Cached narrative momentum load failed")
-            return []
-    finally:
-        drv.close()
-
-
-@st.cache_data(ttl=120, show_spinner="Loading payoff prop arcs…")
-def _cached_payoff_props(_artifact_stamp: tuple[float, float]) -> list[dict[str, Any]]:
-    del _artifact_stamp
-    drv = get_driver()
-    try:
-        try:
-            return get_payoff_prop_timelines(min_scene_gap=PAYOFF_MIN_SCENE_GAP, driver=drv)
-        except (Neo4jError, ServiceUnavailable, AuthError, OSError):
-            _log.exception("Cached payoff prop timelines load failed")
-            return []
-        except Exception:
-            _log.exception("Cached payoff prop timelines load failed")
-            return []
-    finally:
-        drv.close()
-
-
-@st.cache_data(ttl=120, show_spinner="Loading character interaction ranks…")
-def _cached_top_characters(_artifact_stamp: tuple[float, float], top_k: int) -> list[dict[str, Any]]:
-    del _artifact_stamp
-    drv = get_driver()
-    try:
-        try:
-            return get_top_characters_by_interaction_count(top_k, driver=drv)
-        except (Neo4jError, ServiceUnavailable, AuthError, OSError):
-            _log.exception("Cached top characters load failed")
-            return []
-        except Exception:
-            _log.exception("Cached top characters load failed")
-            return []
-    finally:
-        drv.close()
-
-
-@st.cache_data(ttl=120, show_spinner="Resolving primary lead…")
-def _cached_primary_lead(_artifact_stamp: tuple[float, float]) -> tuple[str | None, bool]:
-    del _artifact_stamp
-    drv = get_driver()
-    try:
-        try:
-            override = bool(os.environ.get("SCRIPTRAG_PRIMARY_LEAD_ID", "").strip())
-            pid = resolve_primary_character_id(driver=drv)
-            return (pid, override)
-        except (Neo4jError, ServiceUnavailable, AuthError, OSError):
-            _log.exception("Cached primary lead resolution failed")
-            return (None, False)
-        except Exception:
-            _log.exception("Cached primary lead resolution failed")
-            return (None, False)
-    finally:
-        drv.close()
-
-
-@st.cache_data(ttl=120, show_spinner="Loading script act bounds…")
-def _cached_act_bounds(_artifact_stamp: tuple[float, float]) -> dict[str, Any] | None:
-    del _artifact_stamp
-    drv = get_driver()
-    try:
-        try:
-            return get_script_act_bounds(driver=drv)
-        except (Neo4jError, ServiceUnavailable, AuthError, OSError):
-            _log.exception("Cached script act bounds load failed")
-            return None
-        except Exception:
-            _log.exception("Cached script act bounds load failed")
-            return None
-    finally:
-        drv.close()
-
-
-@st.cache_data(ttl=120, show_spinner="Computing act passivity…")
-def _cached_act_passivity_matrix(
-    _artifact_stamp: tuple[float, float],
-    char_ids: tuple[str, ...],
-    act_bounds_key: tuple[int, int, int, int, int, int] | None,
-) -> dict[str, list[float | None]]:
-    del _artifact_stamp
-    if act_bounds_key is None:
-        return {}
-    act1_lo, act1_hi, act2_lo, act2_hi, act3_lo, act3_hi = act_bounds_key
-    drv = get_driver()
-    try:
-        try:
-            out: dict[str, list[float | None]] = {}
-            for cid in char_ids:
-                a1 = get_passivity_in_scene_window(cid, act1_lo, act1_hi, driver=drv)
-                a2 = get_passivity_in_scene_window(cid, act2_lo, act2_hi, driver=drv)
-                a3 = get_passivity_in_scene_window(cid, act3_lo, act3_hi, driver=drv)
-                out[cid] = [
-                    a1.get("passivity"),
-                    a2.get("passivity"),
-                    a3.get("passivity"),
-                ]
-            return out
-        except (Neo4jError, ServiceUnavailable, AuthError, OSError):
-            _log.exception("Cached act passivity matrix failed")
-            return {}
-        except Exception:
-            _log.exception("Cached act passivity matrix failed")
-            return {}
-    finally:
-        drv.close()
-
-
-@st.cache_data(ttl=120, show_spinner="Counting Neo4j events…")
-def _cached_event_count(_artifact_stamp: tuple[float, float]) -> int:
-    del _artifact_stamp
-    drv = get_driver()
-    try:
-        try:
-            with drv.session() as session:
-                rec = session.run("MATCH (e:Event) RETURN count(e) AS c").single()
-                if rec is None:
-                    return 0
-                raw = rec.get("c", 0)
-                return int(raw) if raw is not None else 0
-        except (Neo4jError, ServiceUnavailable, AuthError, OSError):
-            _log.exception("Cached event count failed")
-            return 0
-        except Exception:
-            _log.exception("Cached event count failed")
-            return 0
-    finally:
-        drv.close()
-
-
-@st.cache_data(ttl=120, show_spinner="Loading structural load snapshot…")
-def _cached_structural_load(_artifact_stamp: tuple[float, float]) -> dict[str, Any]:
-    del _artifact_stamp
-    drv = get_driver()
-    try:
-        try:
-            return get_structural_load_snapshot(driver=drv)
-        except Exception:
-            _log.exception("Cached structural load snapshot failed")
-            return {
-                "scene_count": 0,
-                "character_count": 0,
-                "location_count": 0,
-                "prop_count": 0,
-                "narrative_edge_count": 0,
-                "structural_load_index": 0.0,
-            }
-    finally:
-        drv.close()
-
 
 @st.cache_data(ttl=120, show_spinner="Scanning graph for reconciliation…")
 def _cached_reconciliation_scan(
@@ -492,240 +307,6 @@ def _cached_export_events(_artifact_stamp: tuple[float, float]) -> list[dict[str
         drv.close()
 
 
-# ---------------------------------------------------------------------------
-# Chart rendering (unchanged logic)
-# ---------------------------------------------------------------------------
-
-def _render_momentum_chart(
-    rows: list[dict[str, Any]],
-    act_bounds: dict[str, Any] | None,
-) -> None:
-    st.subheader("Narrative Momentum (rolling pacing)")
-    cap = (
-        "Per-scene **heat** = `CONFLICTS_WITH / (INTERACTS_WITH + CONFLICTS_WITH)` among entities "
-        "co-present in the scene. **Momentum** = trailing **3-scene** mean of that heat (smoothed trend)."
-    )
-    if act_bounds:
-        a1, a2, a3 = act_bounds["act1"], act_bounds["act2"], act_bounds["act3"]
-        b1, b2 = act_bounds["break_after_act1_scene"], act_bounds["break_after_act2_scene"]
-        cap += (
-            f" **Scene span** from Neo4j: **{act_bounds['min_scene']}–{act_bounds['max_scene']}** "
-            f"({act_bounds['scene_count']} scenes). Act buckets = equal thirds of that span "
-            f"(Act 1 **{a1[0]}–{a1[1]}**, Act 2 **{a2[0]}–{a2[1]}**, Act 3 **{a3[0]}–{a3[1]}**). "
-        )
-        if a2[0] > a1[1]:
-            cap += f" Dashed lines: first scene of Act 2 (**{b1}**)"
-            if a3[0] > a2[1]:
-                cap += f", first scene of Act 3 (**{b2}**)."
-            else:
-                cap += "."
-        else:
-            cap += " (Single-scene script — no act dividers.)"
-    else:
-        cap += " No :Event nodes in Neo4j — act dividers omitted."
-    st.caption(cap)
-    if not rows:
-        st.info("No :Event data — run the pipeline and load Neo4j.")
-        return
-
-    df = pd.DataFrame(rows)
-    if "scene_number" not in df.columns:
-        st.warning("Momentum query returned no scene numbers.")
-        return
-    if "heat" not in df.columns or df["heat"].isna().all():
-        st.warning("Momentum data missing heat values.")
-        return
-
-    df = df.sort_values("scene_number")
-    df["heat_num"] = pd.to_numeric(df["heat"], errors="coerce")
-    df["momentum"] = df["heat_num"].rolling(window=ROLLING_SCENES, min_periods=1).mean()
-
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=df["scene_number"],
-            y=df["momentum"],
-            mode="lines",
-            name=f"Momentum ({ROLLING_SCENES}-scene avg)",
-            line=dict(color="#2563eb", width=2.5),
-            fill="tozeroy",
-            fillcolor="rgba(37, 99, 235, 0.18)",
-            hovertemplate="Scene %{x}<br>momentum=%{y:.4f}<extra></extra>",
-        )
-    )
-    if act_bounds:
-        a1, a2, a3 = act_bounds["act1"], act_bounds["act2"], act_bounds["act3"]
-        b1, b2 = act_bounds["break_after_act1_scene"], act_bounds["break_after_act2_scene"]
-        if a2[0] > a1[1]:
-            fig.add_vline(
-                x=b1,
-                line_width=2,
-                line_dash="dash",
-                line_color="#64748b",
-                annotation_text="Act 2 begins",
-                annotation_position="top",
-            )
-        if a3[0] > a2[1] and b2 != b1:
-            fig.add_vline(
-                x=b2,
-                line_width=2,
-                line_dash="dash",
-                line_color="#64748b",
-                annotation_text="Act 3 begins",
-                annotation_position="top",
-            )
-    fig.update_layout(
-        template="plotly_white",
-        height=420,
-        xaxis_title="Scene number",
-        yaxis_title="Momentum (smoothed heat)",
-        yaxis_range=[0, max(0.55, float(df["momentum"].max()) * 1.15) if df["momentum"].notna().any() else 1],
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(t=50),
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def _render_payoff_matrix(props: list[dict[str, Any]]) -> None:
-    st.subheader("The Payoff Matrix (Long-Term Plot Devices)")
-    st.caption(
-        f"Props with **first on-screen intro** (earliest `IN_SCENE` or co-scene `POSSESSES`) and **last narrative use** "
-        f"(`USES` / `CONFLICTS_WITH` in-scene) separated by **>{PAYOFF_MIN_SCENE_GAP}** scenes — filters short-loop noise."
-    )
-    if not props:
-        st.info("No long-arc props match this filter (or graph is empty).")
-        return
-
-    df = pd.DataFrame(props)
-    _payoff_cols = {"id", "first_scene", "last_scene", "gap"}
-    if not _payoff_cols.issubset(df.columns):
-        st.warning("Payoff data missing expected columns.")
-        return
-    df["label"] = df.apply(
-        lambda r: f"{r.get('name') or r['id']} ({r['id']})" if r.get("name") != r.get("id") else str(r["id"]),
-        axis=1,
-    )
-    span = (df["last_scene"] - df["first_scene"]).clip(lower=0.01)
-
-    _cd = list(zip(df["last_scene"].tolist(), df["gap"].tolist()))
-    fig = go.Figure(
-        go.Bar(
-            y=df["label"],
-            x=span,
-            base=df["first_scene"],
-            orientation="h",
-            marker_color="#0d9488",
-            text=df.apply(lambda r: f"{int(r['first_scene'])}→{int(r['last_scene'])}", axis=1),
-            textposition="outside",
-            hovertemplate="%{y}<br>scenes %{base} → %{customdata[0]}<br>gap %{customdata[1]}<extra></extra>",
-            customdata=_cd,
-        )
-    )
-    fig.update_layout(
-        template="plotly_white",
-        height=max(360, min(900, 28 * len(df))),
-        xaxis_title="Scene number (bar spans first → last use)",
-        yaxis_title="",
-        margin=dict(l=24, r=80, t=40, b=40),
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def _render_power_shift(
-    top_chars: list[dict[str, Any]],
-    matrix: dict[str, list[float | None]],
-    act_bounds: dict[str, Any] | None,
-    top_k: int,
-) -> None:
-    st.subheader("Power shift — agency by act")
-    cap = (
-        f"Passivity index (in-degree / total degree on `CONFLICTS_WITH` + `USES`, same as MRI metrics) "
-        f"for the **{top_k}** characters with the most interaction edges. "
-    )
-    if act_bounds:
-        a1, a2, a3 = act_bounds["act1"], act_bounds["act2"], act_bounds["act3"]
-        cap += (
-            f"Act ranges follow **equal thirds** of Neo4j scene span **{act_bounds['min_scene']}–{act_bounds['max_scene']}**: "
-            f"**Act 1** {a1[0]}–{a1[1]}, **Act 2** {a2[0]}–{a2[1]}, **Act 3** {a3[0]}–{a3[1]}."
-        )
-    else:
-        cap += "No :Event nodes — cannot bucket by act."
-    st.caption(cap)
-    if not top_chars:
-        st.info("No characters with interaction edges found.")
-        return
-    valid_chars = [c for c in top_chars if isinstance(c, dict) and c.get("id") is not None]
-    if not valid_chars:
-        st.warning("Character rank data is missing ids — cannot chart power shift.")
-        return
-    if not act_bounds or not matrix:
-        st.info("No :Event scene span in Neo4j — load events to chart act passivity.")
-        return
-
-    act_labels = [
-        f"Act 1 ({act_bounds['act1'][0]}–{act_bounds['act1'][1]})",
-        f"Act 2 ({act_bounds['act2'][0]}–{act_bounds['act2'][1]})",
-        f"Act 3 ({act_bounds['act3'][0]}–{act_bounds['act3'][1]})",
-    ]
-    fig = go.Figure()
-    palette = ["#2563eb", "#dc2626", "#ca8a04", "#7c3aed", "#059669"]
-    for i, c in enumerate(valid_chars):
-        cid = str(c["id"])
-        series = matrix.get(cid, [None, None, None])
-        fig.add_trace(
-            go.Scatter(
-                x=act_labels,
-                y=series,
-                mode="lines+markers",
-                name=f"{c.get('name') or cid} ({cid})",
-                line=dict(width=2, color=palette[i % len(palette)]),
-                marker=dict(size=10),
-                connectgaps=False,
-            )
-        )
-    fig.update_layout(
-        template="plotly_white",
-        height=440,
-        yaxis_title="Passivity (higher = more reactive)",
-        yaxis_range=[0, 1],
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(t=60),
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def _primary_lead_regression_warning(
-    matrix: dict[str, list[float | None]],
-    primary_id: str | None,
-    is_override: bool,
-) -> None:
-    if primary_id is None:
-        st.info(
-            "No primary lead resolved — no characters with interaction edges in Neo4j. "
-            "Arc regression check skipped."
-        )
-        return
-    primary_key = next((k for k in matrix if k.lower() == primary_id.lower()), None)
-    if primary_key is None:
-        src = "configured" if is_override else "analysis"
-        st.info(
-            f"Primary lead id `{primary_id}` ({src}) is not in the act passivity matrix — "
-            "regression check skipped."
-        )
-        return
-    row = matrix.get(primary_key)
-    if not row or len(row) < 3:
-        return
-    p1, _, p3 = row[0], row[1], row[2]
-    if p1 is None or p3 is None:
-        return
-    if float(p3) > float(p1):
-        st.warning(
-            "**FATAL ARC:** The primary lead is regressing — **Act 3 passivity exceeds Act 1** "
-            f"({float(p3):.3f} vs {float(p1):.3f} for **{primary_key}**)."
-        )
-
-
 # ===================================================================
 # Page config & layout
 # ===================================================================
@@ -735,28 +316,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-# --------------- data loads (cached) --------------------------------
-_DASH_STAMP = _neo4j_dashboard_cache_stamp()
-_TOP_K = top_characters_k()
-momentum_rows = _cached_momentum_rows(_DASH_STAMP)
-payoff_rows = _cached_payoff_props(_DASH_STAMP)
-top_chars = _cached_top_characters(_DASH_STAMP, _TOP_K)
-_act_bounds = _cached_act_bounds(_DASH_STAMP)
-_act_bounds_key = _act_bounds_six(_act_bounds) if _act_bounds else None
-_primary_id, _primary_override = _cached_primary_lead(_DASH_STAMP)
-_ids_tuple = tuple(
-    str(c["id"])
-    for c in top_chars
-    if isinstance(c, dict) and c.get("id") is not None
-)
-_extra_ids = list(_ids_tuple)
-if _primary_id:
-    _extra_ids.append(_primary_id)
-_extra = tuple(dict.fromkeys(_extra_ids))
-_act_matrix = _cached_act_passivity_matrix(_DASH_STAMP, _extra, _act_bounds_key)
-_event_count = _cached_event_count(_DASH_STAMP)
-_structural_load = _cached_structural_load(_DASH_STAMP)
 
 # --------------- header ---------------------------------------------
 st.title("ScriptRAG")
@@ -773,32 +332,22 @@ with st.sidebar:
     st.header("Controls")
     if _SCRIPTRAG_DEMO_LAYOUT:
         st.caption(
-            "**Demo layout** (`SCRIPTRAG_DEMO_LAYOUT=1`): tabs emphasize **Verify → Data out** before reconcile "
-            "and analytics — for pipeline storytelling."
+            "**Demo layout** (`SCRIPTRAG_DEMO_LAYOUT=1`): **Verify → Data out** before **Reconcile** "
+            "— for pipeline storytelling."
         )
-    with st.expander("Primary lead", expanded=False):
-        if _primary_id:
-            _src = (
-                "`SCRIPTRAG_PRIMARY_LEAD_ID` override"
-                if _primary_override
-                else "Analysis: rank #1 by interaction edge count"
-            )
-            st.caption(f"**{_primary_id}** — {_src}")
-        else:
-            st.caption("None resolved (empty graph or no interaction edges).")
     if st.button(
-        "Reload metrics from Neo4j",
-        help="Clears Streamlit cache after pipeline or external graph edits.",
+        "Reload Neo4j cache",
+        help="Clears Streamlit cache after pipeline, load, or external graph edits (Data out, Reconcile).",
         key="sidebar_reload",
     ):
         st.cache_data.clear()
         st.session_state["_flash"] = "Cache cleared — re-querying Neo4j."
         st.rerun()
 
-    with st.expander("Reset dashboard data", expanded=False):
+    with st.expander("Reset graph data", expanded=False):
         st.caption(
-            "Clears the **screenplay graph** in Neo4j (what **Dashboard** / **Investigate** read) and removes "
-            "pipeline JSON on disk. **:PipelineRun** rows are kept — **Pipeline Efficiency Tracking** history stays."
+            "Clears the **screenplay graph** in Neo4j and removes pipeline JSON on disk. "
+            "**:PipelineRun** rows are kept — **Pipeline Efficiency Tracking** history stays."
         )
         if st.button("Clear graph & pipeline files", key="sidebar_nuke"):
             try:
@@ -814,7 +363,9 @@ with st.sidebar:
                 )
                 st.rerun()
 
-# --------------- tabs -----------------------------------------------
+# --------------- section navigation ---------------------------------
+# st.tabs() resets the visible tab on every rerun; a keyed radio keeps the user
+# on the same section when widgets below change (e.g. Data out recipe query).
 _tab_labels: list[str] = []
 if _PIPELINE_ENABLED:
     _tab_labels.append("Pipeline")
@@ -824,8 +375,6 @@ if _SCRIPTRAG_DEMO_LAYOUT:
         "Data out",
         "Reconcile",
         "Pipeline Efficiency Tracking",
-        "Dashboard",
-        "Investigate",
     ]
 else:
     _tab_labels += [
@@ -833,33 +382,28 @@ else:
         "Reconcile",
         "Data out",
         "Pipeline Efficiency Tracking",
-        "Dashboard",
-        "Investigate",
     ]
 
-_tabs = st.tabs(_tab_labels)
-_ti = 0
+_cur = st.session_state.get("scriptrag_section")
+if _cur not in _tab_labels:
+    st.session_state.scriptrag_section = _tab_labels[0]
 
-if _PIPELINE_ENABLED:
-    tab_pipeline = _tabs[_ti]; _ti += 1
-tab_editor = _tabs[_ti]; _ti += 1
-if _SCRIPTRAG_DEMO_LAYOUT:
-    tab_data_out = _tabs[_ti]; _ti += 1
-    tab_reconcile = _tabs[_ti]; _ti += 1
-else:
-    tab_reconcile = _tabs[_ti]; _ti += 1
-    tab_data_out = _tabs[_ti]; _ti += 1
-tab_efficiency = _tabs[_ti]; _ti += 1
-tab_dashboard = _tabs[_ti]; _ti += 1
-tab_investigate = _tabs[_ti]; _ti += 1
+st.radio(
+    "Section",
+    options=_tab_labels,
+    horizontal=True,
+    label_visibility="collapsed",
+    key="scriptrag_section",
+)
+_active: str = st.session_state["scriptrag_section"]
+st.divider()
 
 
 # ===================================================================
 # TAB: Pipeline
 # ===================================================================
 
-if _PIPELINE_ENABLED:
-    with tab_pipeline:
+if _PIPELINE_ENABLED and _active == "Pipeline":
         st.header("Pipeline")
         st.caption(
             "Upload a Final Draft (.fdx) screenplay then run the full extraction pipeline. "
@@ -943,7 +487,7 @@ For an 86-scene script: **~$0.85 fast** or **~$2.50 full audit**.
                 min_value=1,
                 max_value=999,
                 value=86,
-                help="How many scenes to process. Set low (e.g. 3–5) to test the agent on a small slice.",
+                help="How many scenes to process. Set low (e.g. 3–5) for a quick pipeline smoke test.",
                 key="pipeline_scene_limit",
             )
         with col_opt2:
@@ -1143,7 +687,7 @@ For an 86-scene script: **~$0.85 fast** or **~$2.50 full audit**.
 # TAB: Verify (warnings + load)
 # ===================================================================
 
-with tab_editor:
+if _active == "Verify":
     st.header("Verify")
     st.caption(
         "Review **warnings** from rules and LLM auditors. **Approve** applies the listed edit before Neo4j load "
@@ -1261,7 +805,7 @@ with tab_editor:
                                 wd.pop(wid, None)
                         st.cache_data.clear()
                         st.session_state["_flash"] = (
-                            f"Loaded **{loaded}** scenes into Neo4j. Dashboard refreshed."
+                            f"Loaded **{loaded}** scenes into Neo4j. Use **Reload Neo4j cache** if counts look stale."
                         )
                         st.rerun()
 
@@ -1270,7 +814,7 @@ with tab_editor:
 # TAB: Reconcile
 # ===================================================================
 
-with tab_reconcile:
+if _active == "Reconcile":
     st.header("Reconcile")
     st.caption(
         "**Optional — post-load entity hygiene.** Scan Neo4j for fuzzy duplicate **Character** / **Location** "
@@ -1417,7 +961,7 @@ with tab_reconcile:
 # TAB: Data out
 # ===================================================================
 
-with tab_data_out:
+if _active == "Data out":
     st.header("Data out")
     st.caption(
         "After **Verify** (HITL) and **Approve & Load**, the screenplay lives as **structured graph data** "
@@ -1432,7 +976,7 @@ with tab_data_out:
     if not _lc and not _rc:
         st.info(
             "No graph statistics yet — connect Neo4j, load from **Verify**, or check credentials. "
-            "Counts refresh with the same cache as the Dashboard (**Reload metrics** in the sidebar)."
+            "Use **Reload Neo4j cache** in the sidebar after loads or external edits."
         )
     else:
         c1, c2 = st.columns(2)
@@ -1518,7 +1062,7 @@ with tab_data_out:
 # TAB: Pipeline Efficiency Tracking
 # ===================================================================
 
-with tab_efficiency:
+if _active == "Pipeline Efficiency Tracking":
     st.header("Pipeline Efficiency Tracking")
     st.caption(
         "**Agentic pipeline observability:** each finished run is a **:PipelineRun** row in Neo4j (survives screenplay reloads). "
@@ -1561,104 +1105,3 @@ with tab_efficiency:
             })
         df = pd.DataFrame(display)
         st.dataframe(df, use_container_width=True, hide_index=True)
-
-
-# ===================================================================
-# TAB: Dashboard
-# ===================================================================
-
-with tab_dashboard:
-    st.header("Dashboard")
-
-    if _event_count > 0:
-        total_scenes_hint = ""
-        pr = st.session_state.get("pipeline_results")
-        if pr and pr.get("total_scenes"):
-            total_scenes_hint = f"/{pr['total_scenes']}"
-        st.caption(
-            f"**{_event_count}{total_scenes_hint}** scenes loaded in Neo4j."
-        )
-        if _act_bounds:
-            st.caption(
-                f"**Script span:** scenes **{_act_bounds['min_scene']}–{_act_bounds['max_scene']}** "
-                f"({_act_bounds['scene_count']} :Event nodes). Act windows = equal thirds."
-            )
-    else:
-        st.info(
-            "No scene data in Neo4j yet. Run the **Pipeline**, use **Verify**, "
-            "then **Approve & Load** to populate the dashboard."
-        )
-
-    st.subheader("Structural load (production signal)")
-    st.caption(
-        "**MET-01 — additive** proxy: average count of **narrative** relationship instances "
-        "(`INTERACTS_WITH`, `CONFLICTS_WITH`, `USES`, `LOCATED_IN`, `POSSESSES`) per **:Event**. "
-        "Higher usually means more graph “physics” to produce per scene — **not** a quality or story score."
-    )
-    if _structural_load.get("scene_count", 0) == 0:
-        st.info("No :Event nodes — structural load appears after you load the graph.")
-    else:
-        sl = _structural_load
-        m1, m2, m3, m4, m5 = st.columns(5)
-        with m1:
-            st.metric("Load index (edges / scene)", f"{sl['structural_load_index']:.2f}")
-        with m2:
-            st.metric("Narrative edges", f"{sl['narrative_edge_count']:,}")
-        with m3:
-            st.metric("Characters", sl["character_count"])
-        with m4:
-            st.metric("Locations", sl["location_count"])
-        with m5:
-            st.metric("Props", sl["prop_count"])
-
-    st.divider()
-    _render_momentum_chart(momentum_rows, _act_bounds)
-    st.divider()
-    _render_payoff_matrix(payoff_rows)
-    st.divider()
-    _render_power_shift(top_chars, _act_matrix, _act_bounds, _TOP_K)
-    _primary_lead_regression_warning(_act_matrix, _primary_id, _primary_override)
-
-
-# ===================================================================
-# TAB: Investigate
-# ===================================================================
-
-with tab_investigate:
-    st.header("Investigate")
-    _inv_cap = (
-        "Ask questions about the script's structure. Answers come from your Neo4j graph."
-    )
-    if _SCRIPTRAG_DEMO_LAYOUT:
-        _inv_cap += (
-            " For demos, prefer **Data out** (recipe Cypher + CSV) first — this tab is **optional NL exploration**."
-        )
-    st.caption(_inv_cap)
-
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    if user_input := st.chat_input("Ask about the script's structure..."):
-        with st.chat_message("user"):
-            st.markdown(user_input)
-        st.session_state.messages.append({"role": "user", "content": user_input})
-
-        exc_name: str | None = None
-        try:
-            response = ask_narrative_mri(user_input)
-        except Exception as exc:
-            _log.exception("Investigate chat failed")
-            response = (
-                "Something went wrong running the graph query. Check Neo4j and try again."
-            )
-            exc_name = type(exc).__name__
-        with st.chat_message("assistant"):
-            st.markdown(response)
-            if exc_name:
-                with st.expander("Technical detail"):
-                    st.code(exc_name, language="text")
-        st.session_state.messages.append({"role": "assistant", "content": response})

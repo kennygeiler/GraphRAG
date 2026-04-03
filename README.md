@@ -7,7 +7,7 @@
            screenplay structure you can measure.
 ```
 
-> upload a screenplay → self-healing AI extraction → human review → neo4j graph → explore with charts and chat. pacing, agency, and long-horizon props—with **verbatim quotes** on every narrative edge. built for writers who want **physics**, not vibes.
+> upload a screenplay → self-healing AI extraction → human review → neo4j graph → export and query structured data. pacing, agency, and long-horizon props—with **verbatim quotes** on every narrative edge. built for writers who want **physics**, not vibes.
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Neo4j](https://img.shields.io/badge/Neo4j-graph-008cc1.svg)](https://neo4j.com/)
@@ -27,7 +27,7 @@ full detail lives in [`strategy.md`](strategy.md). quick context: [`MEMORY.md`](
 
 **GraphRAG** (as an idea) means: put **structure first**—entities and relationships in a **graph**—then **retrieve and reason** through that graph (paths, neighborhoods, typed queries), with answers **grounded in evidence** on nodes and edges—not only “similar chunks” from embeddings.
 
-**ScriptRAG** is **GraphRAG for screenplays**: the script becomes a **typed, evidence-backed knowledge graph** in Neo4j (`source_quote` on narrative edges). Dashboards, **Data out** (Cypher + CSV), and **Investigate** (NL→Cypher) all **read through the graph** instead of unstructured text alone. Extraction is **vertical**: a fixed schema, self-healing pipeline, and **Verify** (HITL)—closer to **curated knowledge extraction** than to generic chunk-and-cluster graph builders.
+**ScriptRAG** is **GraphRAG for screenplays**: the script becomes a **typed, evidence-backed knowledge graph** in Neo4j (`source_quote` on narrative edges). **Data out** (recipe Cypher + CSV) and **`metrics.py`** (CLI) **read through the graph** instead of unstructured text alone. Extraction is **vertical**: a fixed schema, self-healing pipeline, and **Verify** (HITL)—closer to **curated knowledge extraction** than to generic chunk-and-cluster graph builders.
 
 ## sample scripts (`samples/`)
 
@@ -51,14 +51,14 @@ Follow once **Neo4j** and **`.env`** are set ([quick start](#quick-start)):
    ```bash
    cp samples/ludwig/Ludwig.fdx target_script.fdx
    ```
-3. **Optional demo layout** — Set `SCRIPTRAG_DEMO_LAYOUT=1` in `.env` so tabs read **Verify → Data out → …** for walkthroughs.
+3. **Optional demo layout** — Set `SCRIPTRAG_DEMO_LAYOUT=1` in `.env` so sections read **Verify → Data out → Reconcile → …** for walkthroughs.
 4. **Run Streamlit** — `uv run streamlit run app.py` → open **http://localhost:8501**.
 5. **Pipeline** — Enable LLM auditors if you want the full story; run the pipeline and read **self-healing corrections** on the same tab when it finishes.
 6. **Verify** — Approve or decline each **warning**; then **Approve & load** into Neo4j.
-7. **Data out** — Download **CSV** or run **recipe Cypher** to show manipulable graph output.
-8. **Dashboard / Investigate** — Charts and NL→Cypher on the loaded graph.
+7. **Data out** — Pick a **recipe query** or download **CSV**; the app stays on this section when you change the query (horizontal **Section** control, not browser tabs).
+8. **Pipeline Efficiency Tracking** — Inspect **:PipelineRun** history (tokens, cost, warnings).
 
-**Reset without losing runs:** Sidebar **Reset dashboard data** clears the screenplay graph and local pipeline JSON but keeps **`:PipelineRun`** rows for **Pipeline Efficiency Tracking**.
+**Reset without losing runs:** Sidebar **Reset graph data** clears the screenplay graph and local pipeline JSON but keeps **`:PipelineRun`** rows for **Pipeline Efficiency Tracking**.
 
 ## table of contents
 
@@ -68,7 +68,7 @@ Follow once **Neo4j** and **`.env`** are set ([quick start](#quick-start)):
 - [how it works](#how-it-works)
 - [the pipeline](#the-pipeline)
 - [the editor agent](#the-editor-agent-self-healing-extraction)
-- [dashboard](#dashboard)
+- [streamlit app](#streamlit-app)
 - [reconciliation](#reconciliation)
 - [quick start](#quick-start)
 - [environment variables](#environment-variables)
@@ -87,7 +87,7 @@ Follow once **Neo4j** and **`.env`** are set ([quick start](#quick-start)):
 | **ingest** | `ingest.py` + `schema.py` | **per scene**: claude + **instructor** → `SceneGraph`; two-phase self-healing (deterministic rules → llm auditors); edges need `source_id`, `target_id`, `type`, **`source_quote`**. |
 | **load** | `neo4j_loader.py` | merge `:Character` `:Location` `:Prop` `:Event`, `IN_SCENE`, narrative rels. |
 | **analyze** | `metrics.py` | parameterized cypher → momentum, payoff props, passivity windows, etc. |
-| **ui** | `app.py` | streamlit + plotly: pipeline, verify, reconcile, **data out**, efficiency, dashboard, investigate. |
+| **ui** | `app.py` | streamlit: pipeline, verify, reconcile, **data out**, pipeline efficiency (section radio + cached neo4j reads). |
 
 neo4j does **not** read english. it stores **nodes and edges**. streamlit asks **metrics**; metrics ask **cypher**.
 
@@ -158,7 +158,7 @@ neo4j does **not** read english. it stores **nodes and edges**. streamlit asks *
 
 **important corrections** vs a lazy "ai tags the script" story:
 
-- **`parser.py` never calls an api.** only **`lexicon.py`** and **`ingest.py`** (and **`agent.py`** for chat) use the model.
+- **`parser.py` never calls an api.** only **`lexicon.py`** and **`ingest.py`** use the model for extraction.
 - pydantic + instructor **enforce** edge shape; bad structured output **retries or fails**—it doesn't silently save junk.
 - the **editor agent** doesn't just check schemas—it runs a **two-phase validation** on every scene. see below.
 
@@ -192,21 +192,21 @@ audit errors trigger the fixer (up to 2 retries, separate from phase 1). audit w
 
 **cost:** ~$0.03/scene worst case (extraction + fixer + 3 auditors + audit fixer). deterministic checks are free. for an 86-scene script, roughly **$2.50 total**.
 
-## dashboard
+## streamlit app
 
-wide-layout streamlit. seven primary tabs (plus **pipeline** when enabled):
+wide-layout streamlit. a **horizontal section radio** lists **Pipeline** (when enabled), **Verify**, **Reconcile**, **Data out**, and **Pipeline Efficiency Tracking**. this avoids `st.tabs()` snapping back to the first tab when widgets inside **Data out** rerun the script.
 
-| tab | what it is |
-|-----|------------|
+| section | what it is |
+|---------|------------|
 | **pipeline** | upload `.fdx`, run full extraction in-process (live progress, telemetry); saves **:PipelineRun** in neo4j. after a run: **self-healing corrections** (why validation failed, before/after summaries). |
 | **verify** | **warnings** only — check title, what **approve** does, json path; **approve & load** applies edits then loads neo4j. |
 | **reconcile** | optional **post-load** hygiene: **ghost-like characters** (single scene, no conflicts) and **fuzzy duplicate names** for `:Character` and `:Location`; optional confirmed **merges** (rewire relationships, keep one id). |
 | **data out** | **manipulable data** after load: schema card, live node-label / rel-type counts, fixed **recipe cypher** (read-only), **csv** downloads (narrative edges, characters, events). |
 | **pipeline efficiency tracking** | table of past runs from neo4j: scenes, corrections, warnings, telemetry tokens/cost, agent opt. version. |
-| **dashboard** | **structural load** (MET-01: narrative edges per scene + entity counts), **narrative momentum** (per-scene heat = `CONFLICTS_WITH / (INTERACTS_WITH + CONFLICTS_WITH)`, 3-scene rolling mean, dashed act boundaries), **payoff matrix** (long-horizon props > 10 scene gap), **power shift** (passivity index for top **K** characters by act; **K** = `SCRIPTRAG_TOP_CHARACTERS` or default **5**). x/n scenes banner. `st.warning` if **primary lead** regresses (see env vars). |
-| **investigate** | ask questions about the script's structure via natural language → cypher (`agent.py`). |
 
-pipeline tab is hidden when `DISABLE_PIPELINE=1` (read-only deployments).
+**pipeline** is hidden when `DISABLE_PIPELINE=1` (read-only deployments).
+
+structural analytics (momentum, payoff props, passivity windows, structural load MET-01) live in **`metrics.py`** and the CLI — not in the streamlit UI.
 
 ## reconciliation
 
@@ -237,7 +237,7 @@ density-style **production signal** from neo4j: counts of `:Character` / `:Locat
 uv run python metrics.py --structural-load
 ```
 
-same numbers appear on the **dashboard** tab (cached with other metrics).
+use **`uv run python metrics.py --structural-load`** for the same snapshot from the CLI.
 
 ## quick start
 
@@ -280,13 +280,11 @@ NEO4J_PASSWORD=...
 # read-only deployment: hide pipeline tab
 # DISABLE_PIPELINE=1
 
-# optional: pin primary lead for dashboard regression (snake_case Character id)
+# optional: programmatic / lead_resolution.py — primary id and cohort size (not used by streamlit UI)
 # SCRIPTRAG_PRIMARY_LEAD_ID=
-
-# optional: power-shift chart — top N characters (default 5, max 50)
 # SCRIPTRAG_TOP_CHARACTERS=
 
-# optional: demo tab order — verify → data out → reconcile → … (ceo / pipeline storytelling)
+# optional: demo section order — verify → data out → reconcile → … (ceo / pipeline storytelling)
 # SCRIPTRAG_DEMO_LAYOUT=1
 
 # optional: durable local files (e.g. pipeline log); Render → /var/data + disk
@@ -335,7 +333,7 @@ open **http://localhost:8501**, upload your screenplay, and run the pipeline fro
 
 ### reviewer handoff
 
-- **url only:** deploy dashboard against a pre-loaded aura; share https link.
+- **url only:** deploy the app against a pre-loaded aura; share https link.
 - **private git:** invite + `.env.example` → `.env` + `uv sync` + `streamlit run app.py`.
 - screenplay / json may be sensitive—keep repos private and align with your nda.
 
@@ -367,12 +365,11 @@ GraphRAG/
 ├── schema.py                  # pydantic graph contract
 ├── metrics.py                 # cypher analytics
 ├── data_out.py                # schema card, recipe queries, csv-oriented exports for data out tab
-├── app.py                     # streamlit: pipeline, verify, reconcile, data out, efficiency, dashboard, investigate
+├── app.py                     # streamlit: pipeline, verify, reconcile, data out, efficiency
 ├── reconcile.py               # fuzzy duplicate + ghost scan; character/location merge (cli + tab)
-├── lead_resolution.py         # primary lead + top-K from graph; SCRIPTRAG_* overrides
+├── lead_resolution.py         # optional SCRIPTRAG_* helpers for programmatic use
 ├── pipeline_runs.py           # :PipelineRun metrics in neo4j
 ├── cleanup_review.py          # plain-english correction summaries + warning paths
-├── agent.py                   # nl → cypher
 ├── Dockerfile
 ├── docker-compose.yml         # app → external neo4j / aura
 ├── docker-compose.stack.yml   # neo4j + app on one host
