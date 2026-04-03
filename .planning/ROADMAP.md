@@ -47,7 +47,7 @@ This milestone takes ScriptRAG from Cinema Four–centric defaults and brittle d
   1. Operator can run reconciliation at the agreed scope via CLI and/or Streamlit (as implemented), without spelunking undocumented code.
   2. In-app or operator-facing documentation describes what reconcile does, safe merge behavior, and when to use it—consistent with `reconcile.py` and `neo4j_loader` patterns.
   3. A dry-run or confirmation path (or equivalent guardrails documented in UI) makes unintended merges unlikely for the defined workflow.
-**Plans**: TBD
+**Plans**: `03-01-PLAN.md` (scan API + CLI + README), `03-02-PLAN.md` (Streamlit Reconcile tab + MEMORY)
 **UI hint**: yes
 
 ### Phase 4: Production complexity signal
@@ -69,5 +69,5 @@ This milestone takes ScriptRAG from Cinema Four–centric defaults and brittle d
 |-------|----------------|--------|-----------|
 | 1. Config & script-generalized dashboard | 2/2 | Complete | 2026-04-03 |
 | 2. Graph reliability & empty states | 1/1 | Complete | 2026-04-03 |
-| 3. Reconciliation for operators | TBD | Not started | - |
+| 3. Reconciliation for operators | 2 planned (`03-01`, `03-02`) | Planned | - |
 | 4. Production complexity signal | TBD | Not started | - |
