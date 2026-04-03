@@ -69,12 +69,19 @@ You receive:
 Your job: identify significant character interactions, conflicts, or prop uses that \
 are clearly present in the scene text but MISSING from the extracted graph.
 
+Allowed relationship **type** values ONLY (do not invent names like DENIES_ENTRY or BLOCKS):
+INTERACTS_WITH, CONFLICTS_WITH, USES, LOCATED_IN, POSSESSES.
+Map narrative ideas to these: denial of entry, arguments, or refusal → usually \
+CONFLICTS_WITH or INTERACTS_WITH with a verbatim quote from the script.
+
 Rules:
 - Focus on relationships that meaningfully advance the narrative (fights, key prop \
   usage, significant dialogue exchanges).
 - Ignore trivial background details that are not plot-relevant.
-- For each missing relationship, report severity="warning" with a suggestion of what \
-  should be added.
+- In **detail** and **suggestion**, name real lexicon **source_id** / **target_id** \
+  from the graph when possible, and cite the exact relationship type from the list above.
+- For each missing relationship, report severity="warning". The pipeline does **not** \
+  auto-add edges; a human must add them in JSON with a verbatim **source_quote**.
 - Only report genuinely missing items; an empty findings list means extraction is complete.
 """
 
