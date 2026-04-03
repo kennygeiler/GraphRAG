@@ -38,7 +38,8 @@ def save_pipeline_run(
 ) -> str:
     """Write one run record. Returns the new run id.
 
-    ``fdx_filename`` should be the **original name from the Streamlit file uploader**, not the on-disk ``target_script.fdx`` path.
+    ``fdx_filename`` is stored for the **Script Name** column: prefer the uploader’s original filename;
+    fall back to the on-disk target (e.g. ``target_script.fdx``) when the run did not go through upload.
     """
     run_id = str(uuid.uuid4())
     ts = datetime.now(timezone.utc).isoformat()

@@ -508,6 +508,7 @@ The hallucinated-quote check substring-matches each `source_quote` against the s
         _fdx_n = 0
         _fdx_min = 1
         _fdx_max = 1
+        _fdx_loaded = bool(str(st.session_state.get("pipeline_source_fdx_name") or "").strip())
         if _TARGET_FDX.is_file():
             try:
                 _fdx_mtime = _TARGET_FDX.stat().st_mtime
@@ -517,16 +518,18 @@ The hallucinated-quote check substring-matches each `source_quote` against the s
                 str(_TARGET_FDX.resolve()),
                 _fdx_mtime,
             )
-            if _fdx_n > 0:
-                st.info(
-                    f"This FDX has **{_fdx_n}** scene heading(s). "
-                    f"**Scene range** uses FDX scene numbers **{_fdx_min}–{_fdx_max}** (script order)."
-                )
-            else:
-                st.warning(
-                    "Could not read scenes from the current FDX (empty or parse error). "
-                    "**Run Pipeline** will still attempt a full parse."
-                )
+            # Scene stats are for range inputs; banners only after an upload in this session.
+            if _fdx_loaded:
+                if _fdx_n > 0:
+                    st.info(
+                        f"This FDX has **{_fdx_n}** scene heading(s). "
+                        f"**Scene range** uses FDX scene numbers **{_fdx_min}–{_fdx_max}** (script order)."
+                    )
+                else:
+                    st.warning(
+                        "Could not read scenes from the current FDX (empty or parse error). "
+                        "**Run Pipeline** will still attempt a full parse."
+                    )
         else:
             st.caption("Upload a **.fdx** file to see how many scenes it contains.")
 
@@ -727,12 +730,13 @@ The hallucinated-quote check substring-matches each `source_quote` against the s
                         }
                         st.session_state.pop("verify_hitl_neo4j_load_at", None)
                         st.session_state.pop("verify_hitl_load_audit_payload", None)
-                        # Efficiency "filename" is the uploader's original .fdx name only — not on-disk target_script.fdx.
                         if _up is not None:
                             st.session_state["pipeline_source_fdx_name"] = _up.name
-                        _fdx_name = str(
+                        _script_name = str(
                             st.session_state.get("pipeline_source_fdx_name") or ""
                         ).strip()
+                        if not _script_name and _TARGET_FDX.is_file():
+                            _script_name = _TARGET_FDX.name
                         _saved = _persist_pipeline_run(
                             scenes_extracted=len(all_entries),
                             total_scenes=total,
@@ -742,7 +746,7 @@ The hallucinated-quote check substring-matches each `source_quote` against the s
                             telemetry_cost_usd=float(cum_cost or 0.0),
                             failed_scenes=failed_count,
                             llm_auditors_enabled=True,
-                            fdx_filename=_fdx_name,
+                            fdx_filename=_script_name,
                         )
                         if not _saved:
                             st.warning(
@@ -1439,7 +1443,7 @@ if _active == "Pipeline Efficiency Tracking":
     st.caption(
         "**Agentic pipeline observability:** each finished run is a **:PipelineRun** row in Neo4j (survives screenplay reloads). "
         "Use it like production extractor metrics — **tokens**, **estimated cost**, correction/warning counts, scenes processed. "
-        "**Uploaded .fdx** is the name from the Pipeline file uploader (— if the run did not go through an upload in that session). "
+        "**Script Name** is the uploaded screenplay’s original filename when you used the Pipeline uploader, otherwise the on-disk pipeline target (**target_script.fdx**). "
         f"Bump **`AGENT_OPTIMIZATION_VERSION`** in `app.py` when you ship pipeline improvements (current: **{AGENT_OPTIMIZATION_VERSION}**)."
     )
     try:
@@ -1468,7 +1472,7 @@ if _active == "Pipeline Efficiency Tracking":
             _fn = r.get("fdx_filename")
             display.append({
                 "Run (UTC)": str(r.get("ts", ""))[:19].replace("T", " "),
-                "Uploaded .fdx": str(_fn).strip() if _fn else "—",
+                "Script Name": str(_fn).strip() if _fn else "—",
                 "Scenes extracted": f"{ext} / {tot}" if tot else str(ext),
                 "Corrections": int(r.get("corrections_count", 0) or 0),
                 "Warnings": int(r.get("warnings_count", 0) or 0),
