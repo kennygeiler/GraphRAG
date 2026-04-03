@@ -15,7 +15,7 @@ Requirements for the **current planning milestone**: hardening, generalization, 
 
 ### Graph operations
 
-- [ ] **REC-01**: Reconciliation workflows in `reconcile.py` are exposed or documented for operator use at a defined scope (CLI and/or dashboard), with safe merge behavior consistent with existing patterns.
+- [x] **REC-01**: Reconciliation workflows in `reconcile.py` are exposed or documented for operator use at a defined scope (CLI and/or dashboard), with safe merge behavior consistent with existing patterns.
 
 ### Analytics (Phase 3 slice)
 
@@ -37,7 +37,7 @@ Requirements for the **current planning milestone**: hardening, generalization, 
 | CONFIG-01 | 1 | Done (2026-04-03) |
 | GEN-01    | 1 | Done (2026-04-03) |
 | REL-01    | 2 | Done (2026-04-03) |
-| REC-01    | 3 | Not started |
+| REC-01    | 3 | Done (2026-04-03) |
 | MET-01    | 4 | Not started |
 
 *Aligned with `.planning/ROADMAP.md` (coarse v1 track).*

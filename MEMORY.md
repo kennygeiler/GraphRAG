@@ -4,7 +4,7 @@
 
 ## What this is
 
-**ScriptRAG**: `.fdx` → JSON → **Neo4j** (`Character`, `Location`, `Prop`, `Event` + `IN_SCENE` + narrative rels with `source_quote`). **Streamlit** app = upload screenplay → self-healing extraction → **Cleanup Review** → data exploration. Each pipeline run writes a **:PipelineRun** node (efficiency metrics; in-app telemetry tokens/cost).
+**ScriptRAG**: `.fdx` → JSON → **Neo4j** (`Character`, `Location`, `Prop`, `Event` + `IN_SCENE` + narrative rels with `source_quote`). **Streamlit** app = upload screenplay → self-healing extraction → **Cleanup Review** → optional **Reconcile** → data exploration. Each pipeline run writes a **:PipelineRun** node (efficiency metrics; in-app telemetry tokens/cost).
 
 ## Dashboard tabs (`app.py`)
 
@@ -12,6 +12,7 @@
 |-----|---------|
 | **Pipeline** | Upload FDX, run full extraction in-process (parse → lexicon → per-scene LangGraph); live progress; persists **:PipelineRun** to Neo4j after each run |
 | **Cleanup Review** | Plain-English corrections + compact before/after; warnings with graph paths + approve/decline; **Approve & Load** applies approved warning edits (lexicon node drop, duplicate merge, audit edge removal) then loads Neo4j |
+| **Reconcile** | Scan Neo4j for ghost characters + fuzzy **Character** / **Location** name pairs (`reconcile.py`); optional merge with checkbox + pair picker (same merge semantics as CLI: APOC or manual rewire) |
 | **Pipeline Efficiency Tracking** | Table of **:PipelineRun** rows: telemetry tokens/cost, corrections/warnings counts, agent opt. version |
 | **Dashboard** | Momentum line (rolling heat), Payoff Matrix (long-gap props), Power shift (top **K** × 3 acts, **K** from `SCRIPTRAG_TOP_CHARACTERS` or default 5), primary-lead regression warning; X/N scenes banner |
 | **Investigate** | Natural language → Cypher (`agent.py`); Neo4j graph/chain init is **lazy** — app loads if DB is down; user gets a plain message |

@@ -20,7 +20,7 @@
 |------|--------|
 | Graph load | `neo4j_loader.py`, `schema.py` |
 | Analytics | `metrics.py` |
-| UI | `app.py`, `agent.py`, `cleanup_review.py`, `pipeline_runs.py` |
+| UI | `app.py`, `agent.py`, `cleanup_review.py`, `pipeline_runs.py`, `reconcile.py` |
 | ETL engine | `etl_core/graph_engine.py`, `domains/screenplay/adapter.py` |
 | Extract | `ingest.py` (exports `extract_scenes` generator + `SceneResult`), `lexicon.py`, `parser.py` |
 

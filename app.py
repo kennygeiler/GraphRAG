@@ -38,6 +38,12 @@ from metrics import (
 from neo4j_loader import load_entries
 from parser import parse_fdx_to_raw_scenes, write_raw_scenes_json
 from pipeline_runs import list_pipeline_runs, save_pipeline_run
+from reconcile import (
+    ReconciliationScan,
+    merge_characters,
+    merge_entities,
+    run_reconciliation_scan,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -279,6 +285,27 @@ def _cached_event_count(_artifact_stamp: tuple[float, float]) -> int:
         except Exception:
             _log.exception("Cached event count failed")
             return 0
+    finally:
+        drv.close()
+
+
+@st.cache_data(ttl=120, show_spinner="Scanning graph for reconciliation…")
+def _cached_reconciliation_scan(
+    _artifact_stamp: tuple[float, float],
+    min_similarity: float,
+) -> ReconciliationScan:
+    del _artifact_stamp
+    drv = get_driver()
+    try:
+        try:
+            return run_reconciliation_scan(drv, min_similarity=min_similarity)
+        except Exception:
+            _log.exception("Cached reconciliation scan failed")
+            return ReconciliationScan(
+                ghost_characters=[],
+                fuzzy_character_pairs=[],
+                fuzzy_location_pairs=[],
+            )
     finally:
         drv.close()
 
@@ -598,7 +625,7 @@ with st.sidebar:
 _tab_labels: list[str] = []
 if _PIPELINE_ENABLED:
     _tab_labels.append("Pipeline")
-_tab_labels += ["Cleanup Review", "Pipeline Efficiency Tracking", "Dashboard", "Investigate"]
+_tab_labels += ["Cleanup Review", "Reconcile", "Pipeline Efficiency Tracking", "Dashboard", "Investigate"]
 
 _tabs = st.tabs(_tab_labels)
 _ti = 0
@@ -606,6 +633,7 @@ _ti = 0
 if _PIPELINE_ENABLED:
     tab_pipeline = _tabs[_ti]; _ti += 1
 tab_editor = _tabs[_ti]; _ti += 1
+tab_reconcile = _tabs[_ti]; _ti += 1
 tab_efficiency = _tabs[_ti]; _ti += 1
 tab_dashboard = _tabs[_ti]; _ti += 1
 tab_investigate = _tabs[_ti]; _ti += 1
@@ -1045,6 +1073,152 @@ with tab_editor:
                             f"Loaded **{loaded}** scenes into Neo4j. Dashboard refreshed."
                         )
                         st.rerun()
+
+
+# ===================================================================
+# TAB: Reconcile
+# ===================================================================
+
+with tab_reconcile:
+    st.header("Reconcile")
+    st.caption(
+        "Scan Neo4j for fuzzy duplicate **Character** / **Location** names and **ghost** characters "
+        "(single scene, no conflicts). Merges **rewrite the graph** — use **dry-run** on the CLI when unsure."
+    )
+    with st.expander("About reconciliation", expanded=False):
+        st.markdown(
+            """
+- **Fuzzy pairs:** Names are normalized (case, punctuation, word↔digit variants) and compared with
+  **token sort ratio**. Pairs above your similarity threshold are candidates—not proof they are the same role.
+- **Ghost characters:** Characters with exactly **one** `IN_SCENE` event and **no** `CONFLICTS_WITH`
+  (either direction) — often under-connected extras; listed for review only (no auto-delete).
+- **Merge:** One node **id** is kept; the other is removed. Relationships are moved onto the survivor via
+  **APOC `mergeNodes`** when available, otherwise **manual rewire** (`reconcile.py`), matching loader-style safety
+  (allowed rel types only).
+- **CLI:** `uv run python reconcile.py --dry-run` lists the same classes of issues without prompts or writes.
+            """
+        )
+
+    _rec_min_sim = st.slider(
+        "Minimum name similarity (fuzzy pairs)",
+        min_value=0.5,
+        max_value=1.0,
+        value=0.78,
+        step=0.01,
+        key="reconcile_min_sim",
+        help="Higher = fewer, stricter duplicate suggestions.",
+    )
+    _rec_scan = _cached_reconciliation_scan(_neo4j_dashboard_cache_stamp(), _rec_min_sim)
+
+    st.subheader("Ghost characters")
+    if not _rec_scan.ghost_characters:
+        st.info("None found.")
+    else:
+        st.dataframe(
+            pd.DataFrame(_rec_scan.ghost_characters),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.subheader("Fuzzy Character pairs")
+    if not _rec_scan.fuzzy_character_pairs:
+        st.info("None above threshold.")
+    else:
+        _cp_rows: list[dict[str, Any]] = []
+        for a, b, s in _rec_scan.fuzzy_character_pairs:
+            _cp_rows.append(
+                {
+                    "id_a": a.get("id"),
+                    "name_a": a.get("name"),
+                    "id_b": b.get("id"),
+                    "name_b": b.get("name"),
+                    "similarity": round(s, 4),
+                }
+            )
+        st.dataframe(pd.DataFrame(_cp_rows), use_container_width=True, hide_index=True)
+
+    st.subheader("Fuzzy Location pairs")
+    if not _rec_scan.fuzzy_location_pairs:
+        st.info("None above threshold.")
+    else:
+        _lp_rows: list[dict[str, Any]] = []
+        for a, b, s in _rec_scan.fuzzy_location_pairs:
+            _lp_rows.append(
+                {
+                    "id_a": a.get("id"),
+                    "name_a": a.get("name"),
+                    "id_b": b.get("id"),
+                    "name_b": b.get("name"),
+                    "similarity": round(s, 4),
+                }
+            )
+        st.dataframe(pd.DataFrame(_lp_rows), use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.subheader("Apply merge (writes to Neo4j)")
+    st.warning(
+        "Merges are **not** reversible from this app. Prefer `reconcile.py --dry-run`, backups, or Aura snapshots "
+        "before merging."
+    )
+    _rec_ack = st.checkbox(
+        "I understand this will write merges to Neo4j.",
+        key="reconcile_ack_write",
+    )
+    _rec_kind = st.radio(
+        "Pair type",
+        ["Character pair", "Location pair"],
+        horizontal=True,
+        key="reconcile_pair_kind",
+    )
+    _rec_pairs = (
+        _rec_scan.fuzzy_character_pairs
+        if _rec_kind == "Character pair"
+        else _rec_scan.fuzzy_location_pairs
+    )
+    if not _rec_pairs:
+        st.info("No pairs of this type — lower the similarity threshold or load more graph data.")
+    else:
+        _rec_labels = [
+            f"{a.get('name') or a.get('id')} ↔ {b.get('name') or b.get('id')}  ({s:.3f})"
+            for a, b, s in _rec_pairs
+        ]
+        _rec_ix = st.selectbox(
+            "Select pair",
+            list(range(len(_rec_pairs))),
+            format_func=lambda i: _rec_labels[i],
+            key="reconcile_pair_index",
+        )
+        _rec_a, _rec_b, _ = _rec_pairs[_rec_ix]
+        _rec_id_a = str(_rec_a.get("id", ""))
+        _rec_id_b = str(_rec_b.get("id", ""))
+        _rec_keep = st.radio(
+            "Keep node id (survivor)",
+            [_rec_id_a, _rec_id_b],
+            horizontal=True,
+            key="reconcile_keep_id",
+        )
+        if st.button(
+            "Merge selected pair",
+            type="primary",
+            disabled=not _rec_ack,
+            key="reconcile_merge_btn",
+        ):
+            _rec_drop = _rec_id_b if _rec_keep == _rec_id_a else _rec_id_a
+            _rec_drv = get_driver()
+            try:
+                if _rec_kind == "Character pair":
+                    merge_characters(_rec_drv, _rec_keep, _rec_drop)
+                else:
+                    merge_entities(_rec_drv, _rec_keep, _rec_drop, "Location")
+            except Exception:
+                _log.exception("Reconcile merge failed")
+                st.error("Merge failed. Check server logs and that both ids exist in Neo4j.")
+            else:
+                st.cache_data.clear()
+                st.session_state["_flash"] = (
+                    f"Merged into **{_rec_keep}** (removed {_rec_drop}). Cache cleared."
+                )
+                st.rerun()
 
 
 # ===================================================================

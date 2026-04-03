@@ -8,6 +8,7 @@ import argparse
 import os
 import re
 import sys
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from fuzzywuzzy import fuzz
@@ -152,6 +153,28 @@ def find_ghost_characters(session: Any) -> list[dict[str, Any]]:
     ).data()
 
 
+@dataclass
+class ReconciliationScan:
+    ghost_characters: list[dict[str, Any]]
+    fuzzy_character_pairs: list[tuple[dict[str, Any], dict[str, Any], float]]
+    fuzzy_location_pairs: list[tuple[dict[str, Any], dict[str, Any], float]]
+
+
+def run_reconciliation_scan(driver: Any, *, min_similarity: float = 0.78) -> ReconciliationScan:
+    """Read-only scan: ghosts, fuzzy Character pairs, fuzzy Location pairs. No printing."""
+    with driver.session() as session:
+        chars = fetch_characters(session)
+        locs = fetch_locations(session)
+        ghosts = find_ghost_characters(session)
+        char_pairs = find_fuzzy_character_pairs(chars, min_ratio=min_similarity)
+        loc_pairs = find_fuzzy_duplicate_pairs(locs, min_ratio=min_similarity)
+    return ReconciliationScan(
+        ghost_characters=ghosts,
+        fuzzy_character_pairs=char_pairs,
+        fuzzy_location_pairs=loc_pairs,
+    )
+
+
 def _safe_rel_type(typ: str) -> bool:
     return bool(_REL_TYPE_OK.fullmatch(typ))
 
@@ -289,14 +312,43 @@ def _prompt_yes_no(msg: str) -> bool:
 
 def _choose_canonical(a: dict[str, Any], b: dict[str, Any]) -> tuple[str, str]:
     """Return (keep_id, drop_id) — prefer lexicographically smaller id as canonical."""
-    ia, ib = a["id"], b["id"]
+    ia, ib = str(a["id"]), str(b["id"])
     if ia <= ib:
         return ia, ib
     return ib, ia
 
 
+def _merge_pair_loop_cli(
+    driver: Any,
+    pairs: list[tuple[dict[str, Any], dict[str, Any], float]],
+    *,
+    label: str,
+    merge_fn: Any,
+) -> None:
+    print(f"\n=== Merge tool ({label}) ===", flush=True)
+    for a, b, score in pairs:
+        keep_id, drop_id = _choose_canonical(a, b)
+        name_a = f"{a.get('name')} ({a['id']})"
+        name_b = f"{b.get('name')} ({b['id']})"
+        print(
+            f"\nFound [{name_a}] and [{name_b}]  (similarity {score:.3f}).\n"
+            f"Will keep id={keep_id!r}, remove id={drop_id!r}.",
+            flush=True,
+        )
+        if not _prompt_yes_no("Merge?"):
+            print("Skipped.", flush=True)
+            continue
+        try:
+            merge_fn(driver, keep_id, drop_id)
+            print("Merged.", flush=True)
+        except Exception as exc:
+            print(f"❌ Merge failed: {exc}", flush=True)
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Reconcile Character nodes in Neo4j (fuzzy dupes, ghosts, merge).")
+    parser = argparse.ArgumentParser(
+        description="Reconcile Character / Location nodes in Neo4j (ghosts, fuzzy dupes, merge)."
+    )
     parser.add_argument(
         "--min-similarity",
         type=float,
@@ -304,59 +356,76 @@ def main() -> None:
         help="Minimum normalized-name similarity (0–1) to flag a fuzzy pair.",
     )
     parser.add_argument(
+        "--scope",
+        choices=("all", "characters", "locations"),
+        default="all",
+        help="What to list (and which interactive merges to offer): all, characters-only, or locations-only.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Do not prompt for merges; only print fuzzy pairs and ghosts.",
+        help="Do not prompt for merges; only print scan results.",
     )
     args = parser.parse_args()
 
     driver = get_driver()
     try:
-        with driver.session() as session:
-            chars = fetch_characters(session)
-            ghosts = find_ghost_characters(session)
-            pairs = find_fuzzy_character_pairs(chars, min_ratio=args.min_similarity)
+        scan = run_reconciliation_scan(driver, min_similarity=args.min_similarity)
 
-        print("\n=== Ghost nodes (1 scene, 0 conflicts) ===", flush=True)
-        if not ghosts:
-            print("None found.", flush=True)
-        else:
-            print(f"Found {len(ghosts)}:", flush=True)
-            for g in ghosts:
-                print(f"  - {g.get('name')!r} ({g['id']})", flush=True)
+        if args.scope in ("all", "characters"):
+            print("\n=== Ghost nodes (1 scene, 0 conflicts) ===", flush=True)
+            if not scan.ghost_characters:
+                print("None found.", flush=True)
+            else:
+                print(f"Found {len(scan.ghost_characters)}:", flush=True)
+                for g in scan.ghost_characters:
+                    print(f"  - {g.get('name')!r} ({g['id']})", flush=True)
 
-        print("\n=== Fuzzy name matches ===", flush=True)
-        if not pairs:
-            print("None above threshold.", flush=True)
-        else:
-            for a, b, score in pairs:
-                print(
-                    f"  ~{score:.3f}  {a.get('name')!r} ({a['id']})  <->  "
-                    f"{b.get('name')!r} ({b['id']})",
-                    flush=True,
-                )
+            print("\n=== Fuzzy Character name matches ===", flush=True)
+            if not scan.fuzzy_character_pairs:
+                print("None above threshold.", flush=True)
+            else:
+                for a, b, score in scan.fuzzy_character_pairs:
+                    print(
+                        f"  ~{score:.3f}  {a.get('name')!r} ({a['id']})  <->  "
+                        f"{b.get('name')!r} ({b['id']})",
+                        flush=True,
+                    )
 
-        if args.dry_run or not pairs:
+        if args.scope in ("all", "locations"):
+            print("\n=== Fuzzy Location name matches ===", flush=True)
+            if not scan.fuzzy_location_pairs:
+                print("None above threshold.", flush=True)
+            else:
+                for a, b, score in scan.fuzzy_location_pairs:
+                    print(
+                        f"  ~{score:.3f}  {a.get('name')!r} ({a['id']})  <->  "
+                        f"{b.get('name')!r} ({b['id']})",
+                        flush=True,
+                    )
+
+        if args.dry_run:
             return
 
-        print("\n=== Merge tool ===", flush=True)
-        for a, b, score in pairs:
-            keep_id, drop_id = _choose_canonical(a, b)
-            name_a = f"{a.get('name')} ({a['id']})"
-            name_b = f"{b.get('name')} ({b['id']})"
-            print(
-                f"\nFound [{name_a}] and [{name_b}]  (similarity {score:.3f}).\n"
-                f"Will keep id={keep_id!r}, remove id={drop_id!r}.",
-                flush=True,
+        if args.scope in ("all", "characters") and scan.fuzzy_character_pairs:
+            _merge_pair_loop_cli(
+                driver,
+                scan.fuzzy_character_pairs,
+                label="Character pairs",
+                merge_fn=merge_characters,
             )
-            if not _prompt_yes_no("Merge?"):
-                print("Skipped.", flush=True)
-                continue
-            try:
-                merge_characters(driver, keep_id, drop_id)
-                print("Merged.", flush=True)
-            except Exception as exc:
-                print(f"❌ Merge failed: {exc}", flush=True)
+
+        if args.scope in ("all", "locations") and scan.fuzzy_location_pairs:
+
+            def _merge_loc(d: Any, keep: str, drop: str) -> None:
+                merge_entities(d, keep, drop, "Location")
+
+            _merge_pair_loop_cli(
+                driver,
+                scan.fuzzy_location_pairs,
+                label="Location pairs",
+                merge_fn=_merge_loc,
+            )
     finally:
         driver.close()
 

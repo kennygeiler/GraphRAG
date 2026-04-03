@@ -29,6 +29,7 @@ full detail lives in [`strategy.md`](strategy.md). quick context: [`MEMORY.md`](
 - [the pipeline](#the-pipeline)
 - [the editor agent](#the-editor-agent-self-healing-extraction)
 - [dashboard](#dashboard)
+- [reconciliation](#reconciliation)
 - [quick start](#quick-start)
 - [environment variables](#environment-variables)
 - [deployment](#deployment)
@@ -46,7 +47,7 @@ full detail lives in [`strategy.md`](strategy.md). quick context: [`MEMORY.md`](
 | **ingest** | `ingest.py` + `schema.py` | **per scene**: claude + **instructor** → `SceneGraph`; two-phase self-healing (deterministic rules → llm auditors); edges need `source_id`, `target_id`, `type`, **`source_quote`**. |
 | **load** | `neo4j_loader.py` | merge `:Character` `:Location` `:Prop` `:Event`, `IN_SCENE`, narrative rels. |
 | **analyze** | `metrics.py` | parameterized cypher → momentum, payoff props, passivity windows, etc. |
-| **ui** | `app.py` | streamlit + plotly: pipeline, cleanup review, efficiency tracking, dashboard, investigate. |
+| **ui** | `app.py` | streamlit + plotly: pipeline, cleanup review, reconcile, efficiency tracking, dashboard, investigate. |
 
 neo4j does **not** read english. it stores **nodes and edges**. streamlit asks **metrics**; metrics ask **cypher**.
 
@@ -152,17 +153,39 @@ audit errors trigger the fixer (up to 2 retries, separate from phase 1). audit w
 
 ## dashboard
 
-wide-layout streamlit. five tabs (plus **pipeline** when enabled):
+wide-layout streamlit. six tabs (plus **pipeline** when enabled):
 
 | tab | what it is |
 |-----|------------|
 | **pipeline** | upload `.fdx`, run full extraction in-process with live per-scene progress; pass/fix/fail status; telemetry metrics; saves a **:PipelineRun** row in neo4j after each run. |
 | **cleanup review** | plain-english **corrections** (what broke + compact before/after summaries). **warnings** with graph paths + approve/decline for qa. **approve & load to neo4j**. |
+| **reconcile** | scan for **ghost-like characters** (single scene, no conflicts) and **fuzzy duplicate names** for `:Character` and `:Location`; optional confirmed **merges** (rewire relationships, keep one id). |
 | **pipeline efficiency tracking** | table of past runs from neo4j: scenes, corrections, warnings, telemetry tokens/cost, agent opt. version. |
 | **dashboard** | **narrative momentum** (per-scene heat = `CONFLICTS_WITH / (INTERACTS_WITH + CONFLICTS_WITH)`, 3-scene rolling mean, dashed act boundaries), **payoff matrix** (long-horizon props > 10 scene gap), **power shift** (passivity index for top 5 characters by act). x/n scenes banner. `st.warning` if protagonist regresses. |
 | **investigate** | ask questions about the script's structure via natural language → cypher (`agent.py`). |
 
 pipeline tab is hidden when `DISABLE_PIPELINE=1` (read-only deployments).
+
+## reconciliation
+
+after loading a graph into neo4j, **`reconcile.py`** helps clean **duplicate entity names** and surface **low-signal characters** (one scene, no `CONFLICTS_WITH`). it compares normalized names with **fuzzy matching** (token sort ratio). a **merge** keeps one node **id** and moves relationships onto it: **APOC `mergeNodes`** when the plugin is available, otherwise a **manual rewire** (same pattern as the interactive cli tool).
+
+**dry-run** (no writes, no prompts):
+
+```bash
+uv run python reconcile.py --dry-run
+uv run python reconcile.py --dry-run --scope locations
+```
+
+**interactive merges** (y/n per fuzzy pair — characters first when `--scope all`, then locations):
+
+```bash
+uv run python reconcile.py --min-similarity 0.85
+uv run python reconcile.py --scope characters
+uv run python reconcile.py --scope locations
+```
+
+use **`--scope all`** (default) for ghosts + character pairs + location pairs. requires the same **`NEO4J_*`** env vars as the rest of the app. the **reconcile** tab in streamlit runs the same scan and supports **explicit checkbox + per-pair merge** if you prefer the ui.
 
 ## quick start
 
