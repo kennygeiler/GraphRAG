@@ -20,10 +20,10 @@
 |------|--------|
 | Graph load | `neo4j_loader.py`, `schema.py` |
 | Analytics | `metrics.py` |
-| UI | `app.py`, `agent.py`, `cleanup_review.py`, `pipeline_runs.py`, `reconcile.py` |
+| UI | `app.py`, `agent.py`, `cleanup_review.py`, `pipeline_runs.py`, `reconcile.py`, `lead_resolution.py` |
 | ETL engine | `etl_core/graph_engine.py`, `domains/screenplay/adapter.py` |
 | Extract | `ingest.py` (exports `extract_scenes` generator + `SceneResult`), `lexicon.py`, `parser.py` |
 
 ## When you finish a milestone
 
-Update **`strategy.md`** (§3 progress, §4–§5 if metrics or UI changed), then **`MEMORY.md`** / **`.cursorrules`** if the snapshot drifted.
+Update **`strategy.md`** (§3 progress, §4–§5 if metrics or UI changed), then **`MEMORY.md`** / **`.cursorrules`** if the snapshot drifted. GSD planning: **`.planning/PROJECT.md`**, **`.planning/ROADMAP.md`**, **`.planning/MILESTONES.md`** (active milestone **v1.1**).
