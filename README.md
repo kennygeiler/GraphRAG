@@ -9,6 +9,8 @@
 
 # ScriptRAG
 
+0 lines of human code. Cursor + Claude Opus 4.6 + GSD Skills add-on + Kenny's Brain
+
 **ScriptRAG** is an end-to-end **GraphRAG** system for **Final Draft** screenplays: it parses `.fdx`, uses **LLM + structured output** to extract a **validated narrative graph**, optional **human-in-the-loop** review, loads **Neo4j**, and exposes **recipe Cypher**, **CSV exports**, and a **CLI metrics** layer. Narrative edges carry **`source_quote`**—evidence tied to the script, not inferred “vibes.”
 
 **Why I built it:** This repo started as a **sandbox** to experiment with **structured data extraction** from creative text, **token and dollar behavior** across pipeline stages, and **efficiency tradeoffs** (prompt shape, model choice per stage, what to automate vs send to a human). The screenplay domain is the vehicle; the thread running through the work is **measurable pipelines**: know what ran, what it cost, and what changed when you ship a new extraction or audit strategy.
@@ -23,6 +25,7 @@
 | **Repo** | [github.com/kennygeiler/GraphRAG](https://github.com/kennygeiler/GraphRAG) |
 | **Deep dive** | [`strategy.md`](strategy.md) (architecture, metrics, roadmap) · [`AGENTS.md`](AGENTS.md) (conventions) · [`Telemetry.md`](Telemetry.md) (pipeline cost / Token Agent versions) |
 
+[![100% Agentic Codebase](https://img.shields.io/badge/100%25-Agentic%20codebase-5a67d8.svg)](https://github.com/kennygeiler/GraphRAG)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Neo4j](https://img.shields.io/badge/Neo4j-graph-008cc1.svg)](https://neo4j.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-app-FF4B4B.svg)](https://streamlit.io/)
