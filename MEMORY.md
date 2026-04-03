@@ -4,7 +4,7 @@
 
 ## What this is
 
-**ScriptRAG**: `.fdx` → JSON → **Neo4j** (`Character`, `Location`, `Prop`, `Event` + `IN_SCENE` + narrative rels with `source_quote`). **Streamlit** app = upload screenplay → self-healing extraction (**Pipeline** shows corrections) → **Verify** (warnings + load) → optional **Reconcile** → data exploration. Each pipeline run writes a **:PipelineRun** node (efficiency metrics; in-app telemetry tokens/cost).
+**ScriptRAG**: `.fdx` → JSON → **Neo4j** (`Character`, `Location`, `Prop`, `Event` + `IN_SCENE` + narrative rels with `source_quote`). **Streamlit** app = upload screenplay → self-healing extraction (**Pipeline** shows corrections) → **Verify** (warnings + load) → optional **Reconcile** → data exploration. Each pipeline run writes a **:PipelineRun** node (efficiency metrics; in-app telemetry tokens/cost). **Bundled scripts:** `samples/` (Cinema Four full + Ludwig micro-sample, each `.fdx` + companion `.pdf`); root **README** has a **demo walkthrough**.
 
 ## Dashboard tabs (`app.py`)
 

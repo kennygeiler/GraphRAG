@@ -18,6 +18,7 @@
 
 | Area | Files |
 |------|--------|
+| Sample scripts | `samples/` (`samples/README.md`); root **README** demo walkthrough |
 | Graph load | `neo4j_loader.py`, `schema.py` |
 | Analytics | `metrics.py` |
 | UI | `app.py`, `agent.py`, `cleanup_review.py`, `pipeline_runs.py`, `reconcile.py`, `lead_resolution.py`, `data_out.py` |

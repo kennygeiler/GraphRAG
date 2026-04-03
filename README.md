@@ -29,9 +29,42 @@ full detail lives in [`strategy.md`](strategy.md). quick context: [`MEMORY.md`](
 
 **ScriptRAG** is **GraphRAG for screenplays**: the script becomes a **typed, evidence-backed knowledge graph** in Neo4j (`source_quote` on narrative edges). Dashboards, **Data out** (Cypher + CSV), and **Investigate** (NL→Cypher) all **read through the graph** instead of unstructured text alone. Extraction is **vertical**: a fixed schema, self-healing pipeline, and **Verify** (HITL)—closer to **curated knowledge extraction** than to generic chunk-and-cluster graph builders.
 
+## sample scripts (`samples/`)
+
+Bundled **Final Draft (`.fdx`)** files (plus **`.pdf`** reading companions) live under [`samples/`](samples/):
+
+| Path | Use |
+|------|-----|
+| [`samples/cinema-four/Cinema_Four.fdx`](samples/cinema-four/Cinema_Four.fdx) | Full-length **Cinema Four** sample (~86 scenes). |
+| [`samples/cinema-four/Cinema_Four.pdf`](samples/cinema-four/Cinema_Four.pdf) | Human-readable sidecar; pipeline uses the `.fdx`. |
+| [`samples/ludwig/Ludwig.fdx`](samples/ludwig/Ludwig.fdx) | **Short original** 3-scene micro-sample for a **fast** first run. |
+| [`samples/ludwig/Ludwig.pdf`](samples/ludwig/Ludwig.pdf) | Explains the micro-sample; not a feature screenplay. |
+
+Details and copy commands: [`samples/README.md`](samples/README.md).
+
+## demo walkthrough
+
+Follow once **Neo4j** and **`.env`** are set ([quick start](#quick-start)):
+
+1. **Pick a script** — For a **quick** pass, use `samples/ludwig/Ludwig.fdx`. For the full development reference, use `samples/cinema-four/Cinema_Four.fdx`.
+2. **Install it as the pipeline target** (or upload in the UI instead):
+   ```bash
+   cp samples/ludwig/Ludwig.fdx target_script.fdx
+   ```
+3. **Optional demo layout** — Set `SCRIPTRAG_DEMO_LAYOUT=1` in `.env` so tabs read **Verify → Data out → …** for walkthroughs.
+4. **Run Streamlit** — `uv run streamlit run app.py` → open **http://localhost:8501**.
+5. **Pipeline** — Enable LLM auditors if you want the full story; run the pipeline and read **self-healing corrections** on the same tab when it finishes.
+6. **Verify** — Approve or decline each **warning**; then **Approve & load** into Neo4j.
+7. **Data out** — Download **CSV** or run **recipe Cypher** to show manipulable graph output.
+8. **Dashboard / Investigate** — Charts and NL→Cypher on the loaded graph.
+
+**Reset without losing runs:** Sidebar **Reset dashboard data** clears the screenplay graph and local pipeline JSON but keeps **`:PipelineRun`** rows for **Pipeline Efficiency Tracking**.
+
 ## table of contents
 
 - [why graphrag?](#why-graphrag)
+- [sample scripts](#sample-scripts-samples)
+- [demo walkthrough](#demo-walkthrough)
 - [how it works](#how-it-works)
 - [the pipeline](#the-pipeline)
 - [the editor agent](#the-editor-agent-self-healing-extraction)
@@ -54,7 +87,7 @@ full detail lives in [`strategy.md`](strategy.md). quick context: [`MEMORY.md`](
 | **ingest** | `ingest.py` + `schema.py` | **per scene**: claude + **instructor** → `SceneGraph`; two-phase self-healing (deterministic rules → llm auditors); edges need `source_id`, `target_id`, `type`, **`source_quote`**. |
 | **load** | `neo4j_loader.py` | merge `:Character` `:Location` `:Prop` `:Event`, `IN_SCENE`, narrative rels. |
 | **analyze** | `metrics.py` | parameterized cypher → momentum, payoff props, passivity windows, etc. |
-| **ui** | `app.py` | streamlit + plotly: pipeline, cleanup, reconcile, **data out**, efficiency, dashboard, investigate. |
+| **ui** | `app.py` | streamlit + plotly: pipeline, verify, reconcile, **data out**, efficiency, dashboard, investigate. |
 
 neo4j does **not** read english. it stores **nodes and edges**. streamlit asks **metrics**; metrics ask **cypher**.
 
@@ -220,7 +253,7 @@ cp .env.example .env
 uv run streamlit run app.py
 ```
 
-open **http://localhost:8501**. upload your `.fdx` in the **pipeline** tab and click **run pipeline**. use **verify** for warnings, then approve to load into neo4j.
+open **http://localhost:8501**. either **upload** a `.fdx` in **pipeline** or use a file already at **`target_script.fdx`** (e.g. `cp samples/ludwig/Ludwig.fdx target_script.fdx`). run **pipeline**, then **verify** warnings and **approve & load** into neo4j. see **[demo walkthrough](#demo-walkthrough)** and [`samples/`](samples/).
 
 ### cli alternative (headless)
 
@@ -253,7 +286,7 @@ NEO4J_PASSWORD=...
 # optional: power-shift chart — top N characters (default 5, max 50)
 # SCRIPTRAG_TOP_CHARACTERS=
 
-# optional: demo tab order — cleanup → data out → reconcile → … (ceo / pipeline storytelling)
+# optional: demo tab order — verify → data out → reconcile → … (ceo / pipeline storytelling)
 # SCRIPTRAG_DEMO_LAYOUT=1
 
 # optional: durable local files (e.g. pipeline log); Render → /var/data + disk
@@ -310,6 +343,9 @@ open **http://localhost:8501**, upload your screenplay, and run the pipeline fro
 
 ```
 GraphRAG/
+├── samples/                   # bundled .fdx (+ pdf companions); see samples/README.md
+│   ├── cinema-four/
+│   └── ludwig/
 ├── etl_core/                  # domain-agnostic self-healing ETL engine
 │   ├── config.py              #   .env + langsmith bootstrap
 │   ├── state.py               #   langgraph ETLState (tokens, cost, audit)
@@ -331,7 +367,7 @@ GraphRAG/
 ├── schema.py                  # pydantic graph contract
 ├── metrics.py                 # cypher analytics
 ├── data_out.py                # schema card, recipe queries, csv-oriented exports for data out tab
-├── app.py                     # streamlit: pipeline, cleanup, reconcile, data out, efficiency, dashboard, investigate
+├── app.py                     # streamlit: pipeline, verify, reconcile, data out, efficiency, dashboard, investigate
 ├── reconcile.py               # fuzzy duplicate + ghost scan; character/location merge (cli + tab)
 ├── lead_resolution.py         # primary lead + top-K from graph; SCRIPTRAG_* overrides
 ├── pipeline_runs.py           # :PipelineRun metrics in neo4j

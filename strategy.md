@@ -168,7 +168,8 @@ Follow these in every change unless the user explicitly overrides.
 | `MEMORY.md` | Compact snapshot for humans & AI |
 | `AGENTS.md` | Onboarding checklist for coding agents |
 | `.cursorrules` | Cursor-local concise rules + pointer here |
-| `README.md` | Human onboarding & commands |
+| `README.md` | Human onboarding & commands (includes **demo walkthrough** + `samples/` pointers) |
+| `samples/` | Bundled `.fdx` (+ PDF companions): Cinema Four + Ludwig micro-sample; `samples/README.md` |
 | `schema.py` | Pydantic graph contract |
 | `ingest.py` | LLM extraction → `validated_graph.json` (exports `extract_scenes()` generator + `SceneResult`) |
 | `metrics.py` | All graph analytics queries |

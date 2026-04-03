@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<FinalDraft DocumentType="Script" Template="No" Version="2">
+  <Content>
+    <Paragraph Type="Scene Heading" Alignment="Left" Number="1">
+      <Text Style="AllCaps">INT. PRACTICE ROOM - DAY</Text>
+      <UserParagraphData>
+      </UserParagraphData>
+    </Paragraph>
+    <Paragraph Type="Action" Alignment="Left">
+      <Text Style="">A small conservatory room. LUDWIG (17), intense, ink-stained fingers, marks a score in pencil. A metronome ticks.</Text>
+      <UserParagraphData>
+      </UserParagraphData>
+    </Paragraph>
+    <Paragraph Type="Character" Alignment="Left">
+      <Text Style="">LUDWIG</Text>
+      <UserParagraphData>
+      </UserParagraphData>
+    </Paragraph>
+    <Paragraph Type="Dialogue" Alignment="Left">
+      <Text Style="">Again. From the pickup — not the sentimental rubato everyone expects.</Text>
+      <UserParagraphData>
+      </UserParagraphData>
+    </Paragraph>
+    <Paragraph Type="Scene Heading" Alignment="Left" Number="2">
+      <Text Style="AllCaps">INT. HALLWAY - MOMENTS LATER</Text>
+      <UserParagraphData>
+      </UserParagraphData>
+    </Paragraph>
+    <Paragraph Type="Action" Alignment="Left">
+      <Text Style="">ELISE (40s), his teacher, catches him at the door with a folder of competition rules.</Text>
+      <UserParagraphData>
+      </UserParagraphData>
+    </Paragraph>
+    <Paragraph Type="Character" Alignment="Left">
+      <Text Style="">ELISE</Text>
+      <UserParagraphData>
+      </UserParagraphData>
+    </Paragraph>
+    <Paragraph Type="Dialogue" Alignment="Left">
+      <Text Style="">If you sharpen every bar, you will cut the jury. If you blunt them, you bore them.</Text>
+      <UserParagraphData>
+      </UserParagraphData>
+    </Paragraph>
+    <Paragraph Type="Scene Heading" Alignment="Left" Number="3">
+      <Text Style="AllCaps">EXT. CONSERVATORY STEPS - DUSK</Text>
+      <UserParagraphData>
+      </UserParagraphData>
+    </Paragraph>
+    <Paragraph Type="Action" Alignment="Left">
+      <Text Style="">Ludwig sits on the steps, folder closed. He stares at the skyline, jaw tight — too proud to ask for help, too honest to fake the cadenza.</Text>
+      <UserParagraphData>
+      </UserParagraphData>
+    </Paragraph>
+  </Content>
+</FinalDraft>
