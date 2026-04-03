@@ -87,7 +87,7 @@ Follow once **Neo4j** and **`.env`** are set ([quick start](#quick-start)):
 |------|--------|----------------|
 | **parse** | `parser.py` | `.fdx` xml → `raw_scenes.json`. **no llm.** |
 | **lexicon** | `lexicon.py` | whole script text → claude + pydantic → `master_lexicon.json` (stable `snake_case` ids). |
-| **ingest** | `ingest.py` + `schema.py` | **per scene**: claude + **instructor** → `SceneGraph`; **validate** (pydantic + 7 rules) ⇄ **fixer** (llm, up to 3); **optional** llm auditors + audit fixer (up to 2) when enabled. edges need `source_id`, `target_id`, `type`, **`source_quote`**. |
+| **ingest** | `ingest.py` + `schema.py` | **per scene**: claude + **instructor** → `SceneGraph`; **validate** (pydantic + 7 rules) ⇄ **fixer** (llm, up to 3); **optional** llm auditors (3 calls, one pass) when enabled — findings → **verify** warnings only (no semantic auto-repair). edges need `source_id`, `target_id`, `type`, **`source_quote`**. |
 | **load** | `neo4j_loader.py` | merge `:Character` `:Location` `:Prop` `:Event`, `IN_SCENE`, narrative rels. invoked from streamlit **verify** (**approve & load**) or headless after `ingest.py`. |
 | **analyze** | `metrics.py` | **cli / library** — parameterized cypher (momentum, payoff props, passivity windows, structural load, etc.). **not** used by streamlit tabs. |
 | **ui** | `app.py` | streamlit: pipeline, verify, reconcile, **data out**, pipeline efficiency (section radio + cached neo4j reads). **data out** uses `data_out.py` cypher, not `metrics.py`. |
@@ -98,7 +98,7 @@ neo4j does **not** read english. it stores **nodes and edges**. after load, **da
 
 **file flow:** `.fdx` → `parser.py` → `raw_scenes.json` → `lexicon.py` → `master_lexicon.json` → `ingest.py` (per-scene langgraph) → **`validated_graph.json`** on disk. a streamlit **pipeline** run also holds results in **`st.session_state`** until reset.
 
-**per scene (`etl_core/graph_engine.py`):** **extract** → **validate** (pydantic + 7 rules) ⇄ **fixer** (llm repair, up to **3** validate/fix rounds). if **llm auditors** are enabled (pipeline checkbox or `enable_audit=True`): after validate passes → **audit** (three claude calls, bundled) ⇄ **audit_fixer** (up to **2** rounds). if auditors are **disabled**, validate pass **ends** the graph — **no** audit step.
+**per scene (`etl_core/graph_engine.py`):** **extract** → **validate** (pydantic + 7 rules) ⇄ **fixer** (llm repair, up to **3** validate/fix rounds). if **llm auditors** are enabled (pipeline checkbox or `enable_audit=True`): after validate passes → **audit** (three claude calls, bundled) → findings appended to **`warnings`** (including former auditor “errors”, promoted for **verify**). **no** `audit_fixer` loop. if auditors are **disabled**, validate pass **ends** the graph — **no** audit step.
 
 **into neo4j:** extraction **does not** load neo4j. **streamlit:** **verify → approve & load** → `neo4j_loader.load_entries()`. **headless:** `uv run python neo4j_loader.py` after `ingest.py`.
 
@@ -123,9 +123,9 @@ neo4j does **not** read english. it stores **nodes and edges**. after load, **da
                       │                    (≤3)            │
                       │                      │ pass         │
                       │                      ▼             │
-                      │              [if auditors ON]     │
-                      │              AUDIT ⇄ AUDIT_FIXER  │
-                      │                    (≤2)            │
+                      │              [if auditors ON]       │
+                      │              AUDIT (3 calls)        │
+                      │              → warnings for verify   │
                       │                      ▼             │
                       │              scene graph JSON       │
                       └─────────────────┬───────────────────┘
@@ -174,13 +174,13 @@ errors trigger the **fixer** (up to 3 retries). warnings are saved for human rev
 
 | agent | what it does |
 |-------|-------------|
-| **quote fidelity** | verifies that each `source_quote` actually *supports* the claimed relationship type—catches misclassification (e.g. "alan sits next to zev" tagged as `CONFLICTS_WITH`) |
+| **quote fidelity** | verifies that each `source_quote` actually *supports* the claimed relationship type—catches misclassification (e.g. "alan sits next to zev" tagged as `CONFLICTS_WITH`). prompts reserve **error** for hard failures (quote missing from scene text, wrong entities); debatable edge types default to **warning**. |
 | **completeness** | reads the raw scene text and compares it to the extracted graph—finds significant interactions, conflicts, or prop uses the extractor missed |
-| **attribution** | verifies `source_id` and `target_id` are the correct entities for the action described in each quote—catches swapped source/target |
+| **attribution** | verifies `source_id` and `target_id` are the correct entities for the action described in each quote—catches swapped source/target. clear wrong attribution → **error** in model output is still surfaced as a **verify** warning (pipeline does not rewrite the graph). |
 
-audit **errors** trigger the **audit fixer** (up to 2 retries, separate from phase-1 fixer). audit **warnings** go to **verify** for human review.
+all audit findings (warnings and model-scoped **errors**) are merged into **verify**; there is **no** second llm pass to “fix” the graph from audit output. phase-1 **fixer** still handles only pydantic + deterministic rule failures.
 
-**telemetry “cost” (usd):** the app sums **estimated** spend from token counts × a static **$/1m** table in **`etl_core/telemetry.py`** (`estimate_cost`) — **not** your anthropic invoice. actual spend depends on model, pricing changes, and retries. **pipeline** / **efficiency** show those estimates per run. rough **order-of-magnitude** examples (86 scenes, typical lengths): **~$0.01/scene** without auditors vs **~$0.03/scene** with auditors — often **~$0.85** vs **~$2.50** total — treat as **ballparks**, not guarantees.
+**telemetry “cost” (usd):** the app sums **estimated** spend from token counts × a static **$/1m** table in **`etl_core/telemetry.py`** (`estimate_cost`) — **not** your anthropic invoice. actual spend depends on model, pricing changes, and retries. **pipeline** / **efficiency** show those estimates per run. with auditors on, scenes that previously burned **audit fixer** tokens no longer do — totals are typically **lower** than older runs for the same script. rough **order-of-magnitude** examples (86 scenes, typical lengths): **~$0.01/scene** without auditors vs **~$0.03/scene** with auditors — treat as **ballparks**, not guarantees.
 
 ## streamlit app
 
@@ -343,7 +343,7 @@ GraphRAG/
 │   ├── state.py               #   langgraph ETLState (tokens, cost, audit)
 │   ├── telemetry.py           #   anthropic pricing + accumulate_usage
 │   ├── errors.py              #   MaxRetriesError
-│   └── graph_engine.py        #   langgraph: extract → validate ⇄ fix; + audit ⇄ audit_fix if auditors on
+│   └── graph_engine.py        #   langgraph: extract → validate ⇄ fix; + one-pass audit → warnings if auditors on
 ├── domains/
 │   └── screenplay/            # screenplay-specific domain plug-in
 │       ├── schemas.py         #   re-exports SceneGraph, Relationship

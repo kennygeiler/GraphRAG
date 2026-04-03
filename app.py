@@ -993,7 +993,7 @@ if _active == "Verify":
                     title = warning_check_title(check_raw)
                     detail = str(w.get("detail", "") or "")
                     sev = str(w.get("severity", "") or "").strip()
-                    no_auto = check_raw in ("completeness", "audit_skipped")
+                    no_auto = check_raw in ("completeness", "audit_skipped", "audit_errors_unresolved")
                     with st.container(border=True):
                         if no_auto:
                             st.warning(

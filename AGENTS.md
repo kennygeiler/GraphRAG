@@ -23,7 +23,7 @@
 | Graph load | `neo4j_loader.py`, `schema.py` |
 | Analytics | `metrics.py` |
 | UI | `app.py`, `cleanup_review.py`, `pipeline_runs.py`, `reconcile.py`, `data_out.py` |
-| ETL engine | `etl_core/graph_engine.py`, `domains/screenplay/adapter.py` |
+| ETL engine | `etl_core/graph_engine.py`, `domains/screenplay/adapter.py` — optional semantic audit is **one pass**; findings go to **Verify** as warnings (no audit-fix loop) |
 | Extract | `ingest.py` (exports `extract_scenes` generator + `SceneResult`), `lexicon.py`, `parser.py` |
 
 ## When you finish a milestone

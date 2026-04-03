@@ -53,8 +53,8 @@ the claimed relationship type.  A quote might exist in the text but NOT support 
 labelled type (e.g. "Alan sits next to Zev" tagged as CONFLICTS_WITH).
 
 Rules:
-- If the quote does NOT support the relationship type, report severity="error".
-- If the quote partially or ambiguously supports the type, report severity="warning".
+- Use severity="error" only for **hard** failures: the source_quote is missing or not a substring of the scene text, or the quote is about different entities than source_id/target_id.
+- If the quote is present but the **relationship type** is debatable (e.g. INTERACTS_WITH vs directional edge, mild POSSESSES vs wearing), use severity="warning" — humans resolve in Verify.
 - If the quote clearly supports the type, do NOT report it.
 - Only report issues; an empty findings list means everything is correct.
 """
@@ -93,8 +93,8 @@ Common errors to catch:
 - Wrong entity entirely (e.g. a quote about character A but attributed to character B).
 
 Rules:
-- If source_id or target_id is wrong, report severity="error" with a suggestion.
-- If attribution is ambiguous but plausible, report severity="warning".
+- Use severity="error" only when the quote clearly names or implies different actors than source_id/target_id (e.g. swapped roles, wrong character id).
+- If attribution is ambiguous but plausible, or direction of action is arguable, use severity="warning".
 - Only report issues; an empty findings list means attribution is correct.
 """
 

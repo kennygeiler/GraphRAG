@@ -28,6 +28,7 @@ def warning_check_title(check: str) -> str:
         "attribution": "Attribution (semantic check)",
         "completeness": "Possible missing edges (semantic check)",
         "audit_skipped": "Extra validation did not run",
+        "audit_errors_unresolved": "Semantic audit (unresolved after repair)",
     }
     return titles.get(key, key.replace("_", " ").title())
 
@@ -42,6 +43,7 @@ def warning_verify_guidance(check: str) -> str:
         "attribution": "Approve removes one relationship where source/target may be swapped or wrong. Decline if attribution looks correct.",
         "completeness": "The check suggests something may be missing from the graph. Approve only records acknowledgment — you must edit the JSON yourself if you want new edges.",
         "audit_skipped": "Technical failure during an extra validation step; no automatic graph change. Approve/decline is informational only.",
+        "audit_errors_unresolved": "Automated semantic audit could not clear all **error** findings; the graph is unchanged here — use **Verify** to decide edits or fix JSON manually.",
     }
     return hints.get(
         key,
@@ -177,6 +179,9 @@ def warning_hitl_approve_preview(
     if check == "audit_skipped":
         return "**No graph change** — informational only."
 
+    if check == "audit_errors_unresolved":
+        return "**No graph change** from this warning — review auditor text below; edit relationships manually if needed."
+
     return warning_verify_guidance(check)
 
 
@@ -230,6 +235,12 @@ def warning_hitl_evidence_markdown(
         return f"_Node `{nid}` not listed in this scene graph._\n\n> {detail}"
 
     if check in ("quote_fidelity", "attribution", "completeness"):
+        strong = ""
+        if warning.get("verify_from_audit_error"):
+            strong = (
+                "_The auditor originally used **error** severity; the pipeline kept the graph "
+                "and sent this here for your decision._\n\n"
+            )
         idx = warning.get("relationship_index")
         rels = graph.get("relationships") if isinstance(graph.get("relationships"), list) else None
         if rels is not None and idx is not None:
@@ -245,7 +256,8 @@ def warning_hitl_evidence_markdown(
                     tid = str(r.get("target_id", ""))
                     typ = str(r.get("type", ""))
                     return (
-                        f"**Relationship** `graph.relationships[{ix}]` · "
+                        strong
+                        + f"**Relationship** `graph.relationships[{ix}]` · "
                         f"{labels.get(sid, f'`{sid}`')} —(`{typ}`)→ {labels.get(tid, f'`{tid}`')}\n\n"
                         "```text\n"
                         f"{sq if sq else '(empty source_quote)'}\n"
@@ -253,10 +265,16 @@ def warning_hitl_evidence_markdown(
                         f"> {detail}"
                     )
         body = _truncate_hitl_text(detail, 800)
-        return f"> {body}" if body else "_No additional structured evidence._"
+        return strong + (f"> {body}" if body else "_No additional structured evidence._")
 
     if check == "audit_skipped":
         return f"> {detail}" if detail else "_No detail._"
+
+    if check == "audit_errors_unresolved":
+        body = _truncate_hitl_text(detail, 4000)
+        nrel = len(graph["relationships"]) if isinstance(graph.get("relationships"), list) else 0
+        intro = f"_Current extract has **{nrel}** relationship(s). Audit text:_\n\n"
+        return intro + (f"> {body}" if body else "_No detail._")
 
     body = _truncate_hitl_text(detail, 800)
     return f"> {body}" if body else "_No pipeline detail for this check._"
@@ -470,6 +488,9 @@ def apply_approved_warning_edits(
         elif check == "audit_skipped":
             log.append(f"Scene {sn_int}: audit_skipped — no edit.")
 
+        elif check == "audit_errors_unresolved":
+            log.append(f"Scene {sn_int}: audit_errors_unresolved — no automatic edit.")
+
         else:
             log.append(f"Scene {sn_int}: **{check}** — no automatic mutation rule; graph unchanged.")
 
@@ -619,6 +640,10 @@ def warning_json_location(warning: dict[str, Any], entries: list[dict[str, Any]]
 
     if check == "audit_skipped":
         return f"{base} — _Extra validation step failed; deterministic checks only_"
+
+    if check == "audit_errors_unresolved":
+        nrel = len(graph["relationships"]) if isinstance(graph.get("relationships"), list) else 0
+        return f"{base} → `graph` — **{nrel}** relationship(s); see warning detail for audit text"
 
     if check in ("quote_fidelity", "completeness", "attribution"):
         if idx is not None and isinstance(graph.get("relationships"), list):

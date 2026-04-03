@@ -47,7 +47,7 @@ Neo4j QA exports and related helpers live under **`tools/`** (`tools/README.md`)
 
 ## Architecture: engine vs domain
 
-Generic ETL engine lives in `etl_core/` (LangGraph state machine, telemetry, cost tracking). Screenplay-specific models and rules live in `domains/screenplay/`. The engine accepts a pluggable `DomainBundle` so it can be reused for other domains without touching core logic.
+Generic ETL engine lives in `etl_core/` (LangGraph state machine, telemetry, cost tracking). Screenplay-specific models and rules live in `domains/screenplay/`. The engine accepts a pluggable `DomainBundle` so it can be reused for other domains without touching core logic. **Optional LLM auditors** run one pass after validate; all findings go to **Verify** as warnings (no `audit_fixer` / no semantic auto-repair loop).
 
 The `ingest.py` module exposes `extract_scenes()` — a generator that yields per-scene results, consumed by both the CLI (`main()`) and the Streamlit Pipeline tab.
 

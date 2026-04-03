@@ -1,6 +1,9 @@
 """
 Domain-agnostic LangGraph engine:
-  extract → validate → (fix → validate)* → audit → (audit_fix → audit)*.
+  extract → validate → (fix → validate)* → audit (optional).
+
+Semantic audit findings are merged into ``warnings`` for **Verify**; there is
+no automated audit-repair loop (avoids extra LLM rounds on interpretive issues).
 
 All screenplay-specific logic is injected via a DomainBundle so this module
 never imports from ``domains.*`` or ``schema``.
@@ -20,7 +23,6 @@ from etl_core.state import ETLState
 from etl_core.telemetry import accumulate_usage
 
 MAX_FIX_ATTEMPTS = 3
-MAX_AUDIT_ATTEMPTS = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,7 +147,7 @@ def _route_after_validate_with_audit(state: ETLState) -> Literal["fixer", "audit
 
 
 # ---------------------------------------------------------------------------
-# Phase 2 nodes: audit → audit_fixer
+# Phase 2: semantic audit (warnings only — no graph rewrite loop)
 # ---------------------------------------------------------------------------
 
 def _build_auditor(bundle: DomainBundle):
@@ -177,6 +179,13 @@ def _build_auditor(bundle: DomainBundle):
         warns = [f for f in findings if f.get("severity") != "error"]
 
         warnings.extend(warns)
+        # Never block the pipeline on semantic audit: promote model "error"
+        # findings to Verify warnings (same checks, no audit_fix LLM rounds).
+        for f in errors:
+            w = dict(f)
+            w["severity"] = "warning"
+            w["verify_from_audit_error"] = True
+            warnings.append(w)
 
         audit.append({
             "ts": _ts(),
@@ -192,62 +201,12 @@ def _build_auditor(bundle: DomainBundle):
         updates: dict[str, Any] = {
             "audit_trail": audit,
             "warnings": warnings,
+            "last_error": None,
         }
         updates.update(accumulate_usage(state, **usage))
-
-        if errors:
-            error_parts = []
-            for f in errors:
-                msg = f["detail"]
-                if f.get("suggestion"):
-                    msg += f" (suggestion: {f['suggestion']})"
-                error_parts.append(msg)
-            updates["last_error"] = "; ".join(error_parts)
-        else:
-            updates["last_error"] = None
 
         return updates
     return _audit
-
-
-def _build_audit_fixer(bundle: DomainBundle):
-    def _fix(state: ETLState) -> dict[str, Any]:
-        rc = int(state.get("audit_retry_count") or 0) + 1
-        bad_json = state.get("current_json") or {}
-        error_text = state.get("last_error") or ""
-        before_snapshot = dict(bad_json)
-
-        fixed_obj, usage = bundle.fix_llm(bad_json, error_text, state["system_prompt"], state["raw_text"])
-        fixed_json = fixed_obj.model_dump(mode="json")
-
-        audit = list(state.get("audit_trail") or [])
-        audit.append({
-            "ts": _ts(),
-            "doc_id": state.get("doc_id"),
-            "node": "audit_fixer",
-            "detail": "llm_repair_audit",
-            "attempt": rc,
-            "before": before_snapshot,
-            "after": fixed_json,
-            "reason": error_text,
-        })
-        updates: dict[str, Any] = {
-            "current_json": fixed_json,
-            "audit_retry_count": rc,
-            "last_error": None,
-            "audit_trail": audit,
-        }
-        updates.update(accumulate_usage(state, **usage))
-        return updates
-    return _fix
-
-
-def _route_after_audit(state: ETLState) -> Literal["audit_fixer", "__end__"]:
-    if not state.get("last_error"):
-        return END  # type: ignore[return-value]
-    if int(state.get("audit_retry_count") or 0) >= MAX_AUDIT_ATTEMPTS:
-        return END  # type: ignore[return-value]
-    return "audit_fixer"
 
 
 # ---------------------------------------------------------------------------
@@ -268,19 +227,13 @@ def build_graph(bundle: DomainBundle):
 
     if has_audit:
         g.add_node("audit", _build_auditor(bundle))
-        g.add_node("audit_fixer", _build_audit_fixer(bundle))
 
         g.add_conditional_edges(
             "validate",
             _route_after_validate_with_audit,
             {"fixer": "fixer", "audit": "audit", END: END},
         )
-        g.add_conditional_edges(
-            "audit",
-            _route_after_audit,
-            {"audit_fixer": "audit_fixer", END: END},
-        )
-        g.add_edge("audit_fixer", "audit")
+        g.add_edge("audit", END)
     else:
         g.add_conditional_edges(
             "validate",
@@ -300,10 +253,11 @@ def run_pipeline(
     compiled=None,
 ) -> ETLState:
     """
-    Execute the full extract→validate→fix→audit→audit_fix pipeline.
+    Execute extract→validate→(fix→validate)*→audit (optional).
 
-    Raises MaxRetriesError if deterministic validation still fails after
-    MAX_FIX_ATTEMPTS.
+    Raises MaxRetriesError only if Pydantic/rules validation still fails after
+    MAX_FIX_ATTEMPTS. Semantic audit never sets ``last_error``; findings go to
+    ``warnings`` for **Verify**.
     """
     app = compiled or build_graph(bundle)
     state: ETLState = app.invoke({
