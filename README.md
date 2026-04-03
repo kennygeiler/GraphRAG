@@ -11,6 +11,12 @@
 
 **ScriptRAG** is an end-to-end **GraphRAG** system for **Final Draft** screenplays: it parses `.fdx`, uses **LLM + structured output** to extract a **validated narrative graph**, optional **human-in-the-loop** review, loads **Neo4j**, and exposes **recipe Cypher**, **CSV exports**, and a **CLI metrics** layer. Narrative edges carry **`source_quote`**—evidence tied to the script, not inferred “vibes.”
 
+**Why I built it:** This repo started as a **sandbox** to experiment with **structured data extraction** from creative text, **token and dollar behavior** across pipeline stages, and **efficiency tradeoffs** (prompt shape, model choice per stage, what to automate vs send to a human). The screenplay domain is the vehicle; the thread running through the work is **measurable pipelines**: know what ran, what it cost, and what changed when you ship a new extraction or audit strategy.
+
+**Pipeline Efficiency Tracking** is the operational side of that experiment. Each finished run writes a **`:PipelineRun`** in Neo4j with **total** and **per-stage** buckets (**extract / fix / audit**), plus a **Token Agent** label (**`v0`–`v3`**) that maps to **`telemetry_version`**—so a row from last month is comparable to one from today. [**`Telemetry.md`**](Telemetry.md) is the version changelog and A/B log (e.g. Ludwig micro-sample: Phase 1 vs Phase 2 audit routing). **Reserved `v4` / `v5`** in the UI describe the next roadmap waves before the code bumps the constant.
+
+**At scale**, that discipline matters: many scripts or many re-runs make **“roughly cheaper”** useless without **attribution** (which stage moved, after which deploy). Persisting runs in the graph (and keeping them when you **clear** screenplay data) supports **budget planning**, **regression checks** after prompt or model changes, and **comparing** behavior across **versions** the same way you compare **accuracy**—with rows you can filter and export. The roadmap in **`strategy.md`** ties each Token Agent bump to a concrete phase (instrumentation → payload shrink → audit model routing → future conditional audit, caching, etc.).
+
 | | |
 |--|--|
 | **Live demo** | [scriptrag.onrender.com](https://scriptrag.onrender.com/) |
@@ -44,7 +50,7 @@ This is closer to **curated knowledge extraction** (fixed schema, validation, HI
 |------------------------------|-------------------------|
 | **Reproducible** graph queries over **who** interacts, **conflicts**, **uses** props, **where**—with **verbatim quotes** on edges. | **Separation of concerns**: XML parse (no LLM) vs lexicon vs per-scene graph ETL vs Neo4j load vs analytics. |
 | **Human control** where the model is uncertain: **Audit & Verify** on structured warnings, not opaque blobs. | **Domain plug-in** pattern: `etl_core` is domain-agnostic; `domains/screenplay/` supplies schema, rules, auditors. |
-| **Operational visibility**: per-run **extract / fix / audit** token and **estimated** cost in Neo4j (`Telemetry.md`, Token Agent **v1–v3**). | **Parameterized Cypher** only in loaders and metrics; no string-built queries from user text in analytics paths. |
+| **Run history**: per-run **extract / fix / audit** tokens and **estimated** cost in Neo4j, keyed by **Token Agent** version (`Telemetry.md`). | **Parameterized Cypher** only in loaders and metrics; no string-built queries from user text in analytics paths. |
 
 **Problem it solves:** Coverage and structure questions (“is the lead passive in Act II?”, “did we pay off the gun?”) usually get subjective answers. ScriptRAG grounds discussion in **typed graph facts** and **quoted evidence**, then optionally quantifies structure via **`metrics.py`**.
 
@@ -65,7 +71,7 @@ Declared dependencies: see [`pyproject.toml`](pyproject.toml).
 
 ---
 
-## End-to-end flow (high level)
+## End-to-end flow
 
 ```
 Final Draft (.fdx)
@@ -110,7 +116,7 @@ Open **http://localhost:8501**. Upload a `.fdx` in **Pipeline** or copy a sample
 3. **Pipeline** — Full in-process run; **:PipelineRun** saved when Neo4j is reachable; **self-healing corrections** + optional audit decisions table.
 4. **Audit & Verify** — HITL on warnings; **Approve & load** persists to Neo4j.
 5. **Data out** — Schema, live counts, recipe Cypher, CSV downloads.
-6. **Pipeline Efficiency Tracking** — Historical runs; **Token Agent** **v0–v3** on rows; UI text explains reserved **v4** / **v5** (roadmap). Details: [`Telemetry.md`](Telemetry.md).
+6. **Pipeline Efficiency Tracking** — Table of **`:PipelineRun`** rows: timestamps, script name, scene counts, warnings, **total** tokens and estimated $, **E / F / A** columns when Token Agent is **v1+** (**v0** = legacy, stage split **N/A**). Expander text mirrors **`TOKEN_AGENT_SUMMARY_MD`** in `etl_core/telemetry.py`. Full version notes and benchmark tables: [`Telemetry.md`](Telemetry.md).
 
 **Clear screenplay without losing telemetry:** Sidebar **Clear screenplay & pipeline files** wipes Neo4j story data and local pipeline JSON; **`:PipelineRun`** rows remain.
 
@@ -124,7 +130,7 @@ Open **http://localhost:8501**. Upload a `.fdx` in **Pipeline** or copy a sample
 | **Audit & Verify** | Filter/sort/bulk warnings; approve or decline; **Approve & load** → Neo4j; decision log export. |
 | **Reconcile** | Post-load: ghost-style characters, fuzzy **Character** / **Location** pairs; optional merge (with acknowledgment). |
 | **Data out** | Schema card, label/rel counts, read-only recipe queries (`data_out.py`), CSV exports. |
-| **Pipeline Efficiency Tracking** | **:PipelineRun** table (tokens, estimated $, E/F/A stages when Token Agent ≥ v1). |
+| **Pipeline Efficiency Tracking** | **:PipelineRun** history: **Token Agent** = shipped **`telemetry_version`** (**v1–v3** today); **v4** / **v5** described in-app as upcoming roadmap only. Use it to compare runs over time and after deploys. |
 
 Structural analytics (**passivity**, **payoff props**, **structural load** MET-01, etc.) live in **`metrics.py`** and the CLI—not in Streamlit tabs.
 
@@ -143,7 +149,7 @@ Structural analytics (**passivity**, **payoff props**, **structural load** MET-0
 | **Analyze** | `metrics.py` | Parameterized Cypher; CLI entrypoints for structural metrics. |
 | **UI** | `app.py`, `cleanup_review.py`, `data_out.py`, `pipeline_runs.py`, `reconcile.py` | Operator workflows and exports. |
 
-### Per-scene graph engine (accurate)
+### Per-scene graph engine
 
 - **Validate** runs **Pydantic** `SceneGraph` validation, then **business rules** in `domains/screenplay/rules.py`:
   - **Five error-class checks** (trigger **fixer**): e.g. dangling edge IDs, self-edges, invalid relationship kinds for node types, duplicate `LOCATED_IN` per character, **hallucinated** `source_quote` (normalized substring vs scene text).
@@ -287,7 +293,7 @@ Neo4j Aura is provisioned separately; point **`NEO4J_URI`** at your instance.
 | **`reconcile.py`** | Fuzzy scan + merge helpers. |
 | **`cleanup_review.py`** | HITL warning helpers, apply approved edits. |
 | **`parser.py`**, **`lexicon.py`** | Parse and lexicon build. |
-| **`strategy.md`** | Authoritative architecture, metric definitions, roadmap. |
+| **`strategy.md`** | Architecture, metric definitions, roadmap. |
 | **`Telemetry.md`** | Token Agent versions, Ludwig A/B results. |
 | **`AGENTS.md`** | Contributor/agent conventions. |
 
@@ -333,7 +339,7 @@ GraphRAG/
 
 | Doc | Use |
 |-----|-----|
-| **`strategy.md`** | Single source for architecture, dashboard behavior, metric definitions, AI/ETL rules, efficiency roadmap. |
+| **`strategy.md`** | Architecture, dashboard behavior, metric definitions, ETL rules, efficiency roadmap. |
 | **`Telemetry.md`** | Pipeline efficiency versions (**v1–v3** shipped; **v4–v5** reserved), benchmark log. |
 | **`AGENTS.md`** | How to work in the repo (`uv`, parameterized Cypher, where to edit). |
 | **`MEMORY.md`** | Short snapshot for quick orientation. |
