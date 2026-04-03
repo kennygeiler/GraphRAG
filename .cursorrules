@@ -11,7 +11,7 @@
 - **Input:** `.fdx` (Final Draft) → `raw_scenes.json` → lexicon → `validated_graph.json`.
 - **Graph:** Neo4j — `Character`, `Location`, `Prop`, `Event`; `IN_SCENE` + narrative rels with quotes.
 - **Extraction:** Claude via `instructor` + Pydantic (`schema.py`). Self-healing pipeline: extract → validate → fix (up to 3 retries) via `etl_core` LangGraph engine.
-- **Dashboard (`app.py`):** **ScriptRAG** (wide layout). Tabs: **Pipeline** (upload FDX, in-process extraction; each run persists **:PipelineRun** for efficiency), **Cleanup Review** (plain-English fixes + compact before/after; warnings with path + approve/decline; load to Neo4j), **Reconcile** (ghosts + fuzzy Character/Location pairs; optional merge via `reconcile.py`), **Pipeline Efficiency Tracking** (Neo4j run history + telemetry tokens/cost), **Dashboard** (MET-01 structural load, momentum, payoff matrix, power shift, X/N scenes), **Investigate** (ask the graph). **REL-01:** cached Neo4j loaders and charts degrade gracefully; `agent.py` uses lazy Neo4j init.
+- **Dashboard (`app.py`):** **ScriptRAG** (wide layout). Tabs: **Pipeline** (upload FDX, in-process extraction; each run persists **:PipelineRun** for efficiency), **Cleanup Review** (plain-English fixes + compact before/after; warnings with path + approve/decline; load to Neo4j), **Reconcile** (ghosts + fuzzy Character/Location pairs; optional merge via `reconcile.py`), **Pipeline Efficiency Tracking** (Neo4j run history + telemetry tokens/cost), **Dashboard** (MET-01 structural load, momentum, payoff matrix, power shift, primary-lead regression, X/N scenes), **Investigate** (ask the graph). **REL-01:** cached Neo4j loaders and charts degrade gracefully; `agent.py` uses lazy Neo4j init. **`lead_resolution.py`** + **`SCRIPTRAG_*`** for lead/cohort overrides.
 
 ## 2. Metrics (do not conflate)
 
@@ -34,5 +34,5 @@
 
 ## 5. Roadmap hints
 
-- Hardening: primary lead via `lead_resolution` + `SCRIPTRAG_*` env (see `.env.example`); optional env overrides for act breaks if needed.
-- `reconcile.py` at scale; Phase 3 production-complexity overlays — see `strategy.md` §6.
+- **v1.0 shipped:** CONFIG/GEN, REL-01, REC-01, MET-01 — see **`strategy.md`** and **`.planning/MILESTONES.md`**.
+- **Active GSD:** **v1.1** — tests (QA-01/02), LICENSE (DOC-01), Levenshtein polish (PERF-01); **`.planning/ROADMAP.md`** Phases 5–7.
