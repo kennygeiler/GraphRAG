@@ -1,12 +1,12 @@
 # Phase 13 — Verify HITL audit trail (HITL-03)
 
-**Status:** Not started — placeholder for planning.
+**Status:** Complete (2026-04-03) — see `13-01-PLAN.md` / `13-01-SUMMARY.md`.
 
-## Intent
+## Shipped
 
-- On **Approve & Load**, offer download of **CSV/JSON** listing: scene, check, approve/decline/unset, timestamp, optional short note.
-- Optional per-warning text field (“reason for decline”) stored only in export / session log (not Neo4j unless explicitly requested later).
+- Per-warning optional note (Streamlit session); **Decision log** CSV/JSON for current `pr["warnings"]`.
+- On **Approve & Load**, snapshot of **all** warnings before list trim, with `neo4j_load_completed_at` and `neo4j_scenes_loaded` in meta — dedicated last-load downloads.
 
 ## Dependencies
 
-- Phase 11; optionally Phase 12 for consistent warning ordering in exports.
+- Phases 11–12.

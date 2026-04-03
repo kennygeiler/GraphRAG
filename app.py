@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,9 +17,12 @@ import streamlit as st
 
 from cleanup_review import (
     apply_approved_warning_edits,
+    build_verify_audit_payload,
     cleanup_warning_widget_id,
     plain_english_fix_reason,
     summarize_graph_delta,
+    verify_audit_to_csv,
+    verify_audit_to_json,
     warning_check_title,
     warning_hitl_approve_preview,
     warning_hitl_evidence_markdown,
@@ -362,6 +366,8 @@ with st.sidebar:
                 st.error(f"Reset failed: {exc}")
             else:
                 st.session_state.pop("pipeline_results", None)
+                st.session_state.pop("verify_hitl_neo4j_load_at", None)
+                st.session_state.pop("verify_hitl_load_audit_payload", None)
                 st.cache_data.clear()
                 st.session_state["_flash"] = (
                     "Neo4j screenplay graph cleared (PipelineRun history kept); pipeline JSON removed."
@@ -611,6 +617,8 @@ The hallucinated-quote check substring-matches each `source_quote` against the s
                         "tokens": int(cum_tokens or 0),
                         "cost": float(cum_cost or 0.0),
                     }
+                    st.session_state.pop("verify_hitl_neo4j_load_at", None)
+                    st.session_state.pop("verify_hitl_load_audit_payload", None)
                     # Efficiency "filename" is the uploader's original .fdx name only — not on-disk target_script.fdx.
                     if _up is not None:
                         st.session_state["pipeline_source_fdx_name"] = _up.name
@@ -917,10 +925,87 @@ if _active == "Verify":
                             st.success("**Approved** — this edit will run on **Approve & Load**.")
                         elif current == "declined":
                             st.info("**Declined** — treated as false positive; no edit from this warning.")
+                        with st.expander("Optional note (audit export)", expanded=False):
+                            st.caption("Included in **Decision log** CSV/JSON below. Not sent to Neo4j.")
+                            st.text_input(
+                                "Reviewer note",
+                                key=f"verify_hl_note_{wid}",
+                                placeholder="e.g. ticket id, reason for decline…",
+                            )
         else:
             st.success("No warnings — nothing to verify. You can load below.")
 
         st.divider()
+
+        _audit_warnings = list(pr.get("warnings", []))
+        _note_map: dict[str, str] = {}
+        for _wi, _w in enumerate(_audit_warnings):
+            if not isinstance(_w, dict):
+                continue
+            _awid = cleanup_warning_widget_id(_w, _wi)
+            _note_map[_awid] = str(st.session_state.get(f"verify_hl_note_{_awid}", "") or "")
+        _audit_payload = build_verify_audit_payload(
+            _audit_warnings,
+            wd,
+            _note_map,
+            neo4j_loaded_at_iso=st.session_state.get("verify_hitl_neo4j_load_at"),
+            pipeline_meta={
+                "pipeline_extracted_scenes": pr.get("extracted"),
+                "pipeline_failed_scenes": pr.get("failed"),
+                "pipeline_total_scenes": pr.get("total_scenes"),
+            },
+        )
+        _dl_stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        with st.expander("Decision log (audit export)", expanded=False):
+            st.caption(
+                "Download **CSV** or **JSON** of every warning in this pipeline result: decision "
+                "(approve / decline / unset), optional notes, detail text, and timestamps. "
+                "**neo4j_load_completed_at** is set after a successful **Approve & Load** in this session; "
+                "re-download to capture it."
+            )
+            if st.session_state.get("verify_hitl_neo4j_load_at"):
+                st.success(
+                    f"Last **Approve & Load** completed (UTC): "
+                    f"`{st.session_state['verify_hitl_neo4j_load_at'][:19].replace('T', ' ')}`"
+                )
+            d1, d2 = st.columns(2)
+            with d1:
+                st.download_button(
+                    label="Download CSV",
+                    data=verify_audit_to_csv(_audit_payload).encode("utf-8"),
+                    file_name=f"scriptrag_verify_audit_{_dl_stamp}.csv",
+                    mime="text/csv; charset=utf-8",
+                    key="verify_audit_dl_csv",
+                )
+            with d2:
+                st.download_button(
+                    label="Download JSON",
+                    data=verify_audit_to_json(_audit_payload).encode("utf-8"),
+                    file_name=f"scriptrag_verify_audit_{_dl_stamp}.json",
+                    mime="application/json; charset=utf-8",
+                    key="verify_audit_dl_json",
+                )
+            _last_load = st.session_state.get("verify_hitl_load_audit_payload")
+            if isinstance(_last_load, dict) and (_last_load.get("decisions") or []):
+                st.markdown("**Last Approve & Load** — snapshot of **all** warnings before approved rows were dropped:")
+                _ls = _last_load.get("meta", {}).get("exported_at", _dl_stamp)[:19].replace(":", "")
+                ll1, ll2 = st.columns(2)
+                with ll1:
+                    st.download_button(
+                        label="Download last-load CSV",
+                        data=verify_audit_to_csv(_last_load).encode("utf-8"),
+                        file_name=f"scriptrag_verify_audit_last_load_{_ls}.csv",
+                        mime="text/csv; charset=utf-8",
+                        key="verify_audit_dl_csv_lastload",
+                    )
+                with ll2:
+                    st.download_button(
+                        label="Download last-load JSON",
+                        data=verify_audit_to_json(_last_load).encode("utf-8"),
+                        file_name=f"scriptrag_verify_audit_last_load_{_ls}.json",
+                        mime="application/json; charset=utf-8",
+                        key="verify_audit_dl_json_lastload",
+                    )
 
         entries_to_load = pr.get("entries", [])
         if not entries_to_load:
@@ -932,10 +1017,20 @@ if _active == "Verify":
                 key="editor_approve_load",
             ):
                 with st.spinner("Applying approved warning edits & loading into Neo4j…"):
+                    _snap_warnings = list(pr.get("warnings", []))
+                    _snap_decisions = dict(wd)
+                    _snap_notes: dict[str, str] = {}
+                    for _si, _sw in enumerate(_snap_warnings):
+                        if not isinstance(_sw, dict):
+                            continue
+                        _swid = cleanup_warning_widget_id(_sw, _si)
+                        _snap_notes[_swid] = str(
+                            st.session_state.get(f"verify_hl_note_{_swid}", "") or ""
+                        )
                     try:
                         to_load, edit_log = apply_approved_warning_edits(
                             entries_to_load,
-                            pr.get("warnings", []),
+                            _snap_warnings,
                             wd,
                         )
                         if edit_log:
@@ -946,15 +1041,31 @@ if _active == "Verify":
                     except Exception as exc:
                         st.error(f"Load failed: {exc}")
                     else:
+                        _neo_ts = datetime.now(timezone.utc).isoformat()
+                        st.session_state["verify_hitl_neo4j_load_at"] = _neo_ts
+                        st.session_state["verify_hitl_load_audit_payload"] = (
+                            build_verify_audit_payload(
+                                _snap_warnings,
+                                _snap_decisions,
+                                _snap_notes,
+                                neo4j_loaded_at_iso=_neo_ts,
+                                pipeline_meta={
+                                    "pipeline_extracted_scenes": pr.get("extracted"),
+                                    "pipeline_failed_scenes": pr.get("failed"),
+                                    "pipeline_total_scenes": pr.get("total_scenes"),
+                                    "neo4j_scenes_loaded": loaded,
+                                },
+                            )
+                        )
                         pr["entries"] = to_load
                         pr["warnings"] = [
                             w
-                            for wi, w in enumerate(pr.get("warnings", []))
-                            if wd.get(cleanup_warning_widget_id(w, wi)) != "approved"
+                            for wi, w in enumerate(_snap_warnings)
+                            if _snap_decisions.get(cleanup_warning_widget_id(w, wi)) != "approved"
                         ]
-                        for wi, w in enumerate(warnings_list):
+                        for wi, w in enumerate(_snap_warnings):
                             wid = cleanup_warning_widget_id(w, wi)
-                            if wd.get(wid) == "approved":
+                            if _snap_decisions.get(wid) == "approved":
                                 wd.pop(wid, None)
                         st.cache_data.clear()
                         st.session_state["_flash"] = (

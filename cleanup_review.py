@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import copy
+import csv
+import io
+import json
 import re
+from datetime import datetime, timezone
 from typing import Any
 
 _QUOTE_MERGE_SEP = "\n---\n"
@@ -622,3 +626,78 @@ def warning_json_location(warning: dict[str, Any], entries: list[dict[str, Any]]
         return f"{base} → `graph` — **{check}**"
 
     return f"{base} → `graph` — **{check}**"
+
+
+def build_verify_audit_payload(
+    warnings: list[Any],
+    decisions: dict[str, str],
+    note_by_widget_id: dict[str, str],
+    *,
+    neo4j_loaded_at_iso: str | None = None,
+    pipeline_meta: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Structured audit document for Verify HITL exports (CSV/JSON)."""
+    exported_at = datetime.now(timezone.utc).isoformat()
+    rows: list[dict[str, Any]] = []
+    for wi, w in enumerate(warnings):
+        if not isinstance(w, dict):
+            continue
+        wid = cleanup_warning_widget_id(w, wi)
+        rows.append(
+            {
+                "warning_index": wi,
+                "widget_id": wid,
+                "scene_number": w.get("scene_number"),
+                "check": w.get("check"),
+                "severity": w.get("severity"),
+                "relationship_index": w.get("relationship_index"),
+                "decision": decisions.get(wid, "unset"),
+                "note": (note_by_widget_id.get(wid) or "").strip(),
+                "detail": str(w.get("detail") or ""),
+                "exported_at": exported_at,
+                "neo4j_load_completed_at": neo4j_loaded_at_iso or "",
+            }
+        )
+    meta: dict[str, Any] = {
+        "exported_at": exported_at,
+        "neo4j_load_completed_at": neo4j_loaded_at_iso,
+    }
+    if pipeline_meta:
+        meta.update(pipeline_meta)
+    return {"meta": meta, "decisions": rows}
+
+
+def verify_audit_to_csv(payload: dict[str, Any]) -> str:
+    """CSV string for ``build_verify_audit_payload`` output."""
+    rows = list(payload.get("decisions") or [])
+    fieldnames = [
+        "warning_index",
+        "widget_id",
+        "scene_number",
+        "check",
+        "severity",
+        "relationship_index",
+        "decision",
+        "note",
+        "detail",
+        "exported_at",
+        "neo4j_load_completed_at",
+    ]
+    buf = io.StringIO()
+    wr = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+    wr.writeheader()
+    for r in rows:
+        line: dict[str, Any] = {}
+        for k in fieldnames:
+            v = r.get(k)
+            s = "" if v is None else str(v)
+            if k in ("detail", "note"):
+                s = s.replace("\r\n", " ").replace("\n", " ⏎ ").replace("\r", " ")
+            line[k] = s
+        wr.writerow(line)
+    return buf.getvalue()
+
+
+def verify_audit_to_json(payload: dict[str, Any]) -> str:
+    """Pretty JSON string (UTF-8 safe when encoded)."""
+    return json.dumps(payload, ensure_ascii=False, indent=2)

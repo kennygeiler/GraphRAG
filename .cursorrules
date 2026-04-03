@@ -11,7 +11,7 @@
 - **Input:** `.fdx` (Final Draft) → `raw_scenes.json` → lexicon → `validated_graph.json`.
 - **Graph:** Neo4j — `Character`, `Location`, `Prop`, `Event`; `IN_SCENE` + narrative rels with quotes.
 - **Extraction:** Claude via `instructor` + Pydantic (`schema.py`). Self-healing pipeline: extract → validate → fix (up to 3 retries) via `etl_core` LangGraph engine.
-- **Streamlit (`app.py`):** **ScriptRAG** (wide layout). Sections (horizontal **radio**, not tabs): **Pipeline** (incl. self-heal corrections), **Verify** (filter/sort, bulk duplicate approve, evidence + preview + load), **Reconcile**, **Data out** (`data_out.py`), **Pipeline Efficiency Tracking**. Neo4j **Reset graph data** keeps **:PipelineRun**. **REL-01:** cached loaders for Reconcile / Data out. Charts + NL→Cypher **removed**; **`metrics.py`** / CLI keep structural analytics.
+- **Streamlit (`app.py`):** **ScriptRAG** (wide layout). Sections (horizontal **radio**, not tabs): **Pipeline** (incl. self-heal corrections), **Verify** (filter/sort/bulk, evidence, notes, audit CSV/JSON, load), **Reconcile**, **Data out** (`data_out.py`), **Pipeline Efficiency Tracking**. Neo4j **Reset graph data** keeps **:PipelineRun**. **REL-01:** cached loaders for Reconcile / Data out. Charts + NL→Cypher **removed**; **`metrics.py`** / CLI keep structural analytics.
 
 ## 2. Metrics (do not conflate)
 

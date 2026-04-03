@@ -12,9 +12,9 @@ End-to-end, **evidence-backed** structural analysis of a screenplay in a queryab
 
 ## Current milestones
 
-### v1.3 — Verify HITL depth (in progress)
+### v1.3 — Verify HITL depth (complete)
 
-**Goal:** Faster, safer **Verify**: graph evidence on cards, entity labels, Approve preview, scene grouping; later filter/bulk (HITL-02) and decision export (HITL-03). See `.planning/ROADMAP.md` Phases 11–13.
+**Goal:** Faster, safer **Verify**: evidence cards (HITL-01), filter/sort/bulk duplicates (HITL-02), audit CSV/JSON + notes + last-load snapshot (HITL-03). See `.planning/ROADMAP.md` Phases 11–13.
 
 ### v1.2 — Demo & data-out flow (complete)
 
@@ -46,10 +46,10 @@ End-to-end, **evidence-backed** structural analysis of a screenplay in a queryab
 - ✓ **Demo layout flag (DEMO-01)** — `SCRIPTRAG_DEMO_LAYOUT` tab order + copy (v1.2 Phase 10, 2026-04-03).
 - ✓ **Verify HITL evidence (HITL-01)** — Approve preview, evidence expander, scene grouping, no-auto-edit banners (`cleanup_review.py` + `app.py` Verify; v1.3 Phase 11, 2026-04-03).
 - ✓ **Verify HITL workflow scale (HITL-02)** — Filter/sort controls; bulk Approve for visible `duplicate_relationship` (extract + per-scene) with confirmation (`app.py` Verify; v1.3 Phase 12, 2026-04-03).
+- ✓ **Verify HITL audit trail (HITL-03)** — Decision log CSV/JSON, optional per-warning notes, last-load snapshot with Neo4j timestamp (`cleanup_review.py` + `app.py` Verify; v1.3 Phase 13, 2026-04-03).
 
 ### Active
 
-- **v1.3 Phase 13** — HITL audit trail (see ROADMAP).
 - **v1.1** — QA/LICENSE/Levenshtein (Phases 5–7).
 - [ ] **QA-01 / QA-02** — Unit tests for structural load and reconcile scan (mocked driver); see `.planning/REQUIREMENTS.md` v1.1.
 - [ ] **DOC-01** — LICENSE + README license alignment.
@@ -104,4 +104,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 — v1.3 Phase 12 HITL-02 (Verify filter, sort, bulk duplicates).*
+*Last updated: 2026-04-03 — v1.3 Phase 13 HITL-03 (Verify audit export + notes).*
