@@ -193,7 +193,7 @@ wide-layout streamlit. a **horizontal section radio** lists **Pipeline** (when e
 | **audit & verify** | **HITL warnings** — filter/sort/bulk where supported; **approve & load** applies approved edits then loads neo4j. graph JSON from the pipeline already includes any **auto-applied** semantic patches. |
 | **reconcile** | optional **post-load** hygiene: **ghost-like characters** (single scene, no conflicts) and **fuzzy duplicate names** for `:Character` and `:Location`; optional confirmed **merges** (rewire relationships, keep one id). |
 | **data out** | **manipulable data** after load: schema card, live node-label / rel-type counts, fixed **recipe cypher** (read-only), **csv** downloads (narrative edges, characters, events). |
-| **pipeline efficiency tracking** | table of past runs from neo4j: scenes, corrections, warnings, tokens/cost totals + extract/fix/audit split, **`telemetry_version`** (**0** = legacy). phase log: **`Telemetry.md`**. |
+| **pipeline efficiency tracking** | table of past runs from neo4j: scenes, corrections, warnings, totals + per-stage split when **Token Agent** is **v1+** (**v0** = legacy: **N/A** for E/F/A columns). phase log: **`Telemetry.md`**. |
 
 **pipeline** is hidden when `DISABLE_PIPELINE=1` (read-only deployments).
 

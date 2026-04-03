@@ -1588,17 +1588,24 @@ if _active == "Pipeline Efficiency Tracking":
             f_usd = float(r.get("fix_cost_usd", 0) or 0)
             a_usd = float(r.get("audit_cost_usd", 0) or 0)
             tver = int(r.get("telemetry_version", 0) or 0)
+            token_agent = f"v{tver}"
+            if tver == 0:
+                efa_tok_cell = "N/A"
+                efa_usd_cell = "N/A"
+            else:
+                efa_tok_cell = f"{e_tok:,} / {f_tok:,} / {a_tok:,}"
+                efa_usd_cell = f"{round(e_usd, 4)} / {round(f_usd, 4)} / {round(a_usd, 4)}"
             display.append({
                 "Run (UTC)": str(r.get("ts", ""))[:19].replace("T", " "),
-                "Telemetry v": tver,
+                "Token Agent": token_agent,
                 "Script Name": str(_fn).strip() if _fn else "—",
                 "Scenes extracted": f"{ext} / {tot}" if tot else str(ext),
                 "Corrections": int(r.get("corrections_count", 0) or 0),
                 "Warnings": int(r.get("warnings_count", 0) or 0),
                 "Tokens (total)": tel_tok,
                 "Cost ($ total)": round(tel_cost, 4),
-                "Tok E / F / A": f"{e_tok:,} / {f_tok:,} / {a_tok:,}",
-                "$ E / F / A": f"{round(e_usd, 4)} / {round(f_usd, 4)} / {round(a_usd, 4)}",
+                "Tok E / F / A": efa_tok_cell,
+                "$ E / F / A": efa_usd_cell,
                 "Failed scenes": int(r.get("failed_scenes", 0) or 0),
             })
         df = pd.DataFrame(display)

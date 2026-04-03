@@ -6,7 +6,7 @@
 
 ## `telemetry_version` on `:PipelineRun`
 
-Each run stores integer **`telemetry_version`** in Neo4j (shown as **Telemetry v** in **Pipeline Efficiency Tracking**).
+Each run stores integer **`telemetry_version`** in Neo4j. **Pipeline Efficiency Tracking** shows it under **Token Agent** as **`v0`**, **`v1`**, … (legacy **`v0`** rows show **N/A** for per-stage token/$ columns).
 
 | Version | Meaning |
 |---------|---------|
@@ -32,7 +32,7 @@ Each run stores integer **`telemetry_version`** in Neo4j (shown as **Telemetry v
 
 Add rows as you ship phases. Copy from **Pipeline Efficiency Tracking** or export.
 
-| Date (UTC) | Telemetry v | Strategy phase | Script / range | Scenes | Total tok | Total $ | E / F / A tok (if v≥1) | Notes |
+| Date (UTC) | Token Agent | Strategy phase | Script / range | Scenes | Total tok | Total $ | E / F / A tok (if v≥1) | Notes |
 |------------|---------------|----------------|----------------|--------|-----------|---------|------------------------|-------|
 | *(example)* | 1 | Phase 0 shipped | Cinema Four smoke | 5 | … | … | … / … / … | Baseline post-instrumentation |
 

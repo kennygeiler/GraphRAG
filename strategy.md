@@ -132,7 +132,7 @@ These definitions are what code should implement; if code diverges, fix code or 
 2. **Audit & Verify** — Warnings (deterministic rules + semantic audit HITL): **filter** / **sort** / **bulk Approve** (duplicates); **Approve preview**, **evidence expander**, **scene-grouped** cards, **no-auto-edit** banners; optional **per-warning notes**; **Decision log** CSV/JSON export + **last-load snapshot** (includes `neo4j_load_completed_at`). JSON path + per-warning approve/decline. "Approve & Load" → `neo4j_loader.load_entries()` (graph wipe spares `:PipelineRun`). Prior session key **`Verify`** is migrated to this label.
 3. **Reconcile** — Optional **post-load** hygiene: ghost characters + fuzzy Character/Location pairs; optional merges (`reconcile.py`). *Default order places Reconcile before Data out unless* **`SCRIPTRAG_DEMO_LAYOUT=1`** *puts Data out first.*
 4. **Data out** — Schema card, live label/relationship counts, fixed **recipe Cypher** (parameterized), CSV downloads for narrative edges / characters / events (`data_out.py`).
-5. **Pipeline Efficiency Tracking** — Reads **`:PipelineRun`** from Neo4j (total + extract/fix/audit token and USD breakdown, run metadata).
+5. **Pipeline Efficiency Tracking** — Reads **`:PipelineRun`** from Neo4j. Column **Token Agent** shows **`v0`**, **`v1`**, … (from integer **`telemetry_version`**). **v0** legacy rows: per-stage **Tok E / F / A** and **$ E / F / A** display **N/A** (not tracked).
 
 **Sidebar:** **Reload Neo4j cache** clears `@st.cache_data`. **Reset graph data** clears the screenplay graph in Neo4j and local pipeline JSON but keeps **:PipelineRun** rows.
 

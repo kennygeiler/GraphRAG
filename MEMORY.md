@@ -16,7 +16,7 @@ Navigation is a **horizontal radio** (`scriptrag_section`), not `st.tabs`, so in
 | **Audit & Verify** | **Filter/sort/bulk** duplicates; **preview** + **evidence**; optional **notes**; **Decision log** CSV/JSON + **last-load** snapshot; **Approve & Load** → Neo4j (HITL warnings only; auto-applied audit edits already in graph JSON) |
 | **Reconcile** | Optional post-load hygiene: ghost characters + fuzzy **Character** / **Location** name pairs (`reconcile.py`); optional merge with checkbox + pair picker (APOC or manual rewire) |
 | **Data out** | Schema card, live Neo4j label/rel counts, fixed recipe Cypher (`data_out.py`), CSV downloads (narrative edges, characters, events) |
-| **Pipeline Efficiency Tracking** | Table of **:PipelineRun** rows: telemetry totals + per-stage (E/F/A) tokens/$, corrections/warnings |
+| **Pipeline Efficiency Tracking** | **:PipelineRun** rows: **Token Agent** **v0**/v1/…, totals; **v0** shows **N/A** for E/F/A split columns |
 
 **Pipeline** hidden when `DISABLE_PIPELINE=1` (read-only deployments). **`SCRIPTRAG_DEMO_LAYOUT=1`** reorders **Audit & Verify → Data out → Reconcile → …** (default is **Audit & Verify → Reconcile → Data out → …**).
 
