@@ -11,7 +11,7 @@
 | Tab | Purpose |
 |-----|---------|
 | **Pipeline** | Upload FDX, run full extraction in-process (parse → lexicon → per-scene LangGraph); live progress; persists **:PipelineRun** to Neo4j after each run |
-| **Cleanup Review** | Plain-English corrections + compact before/after summaries; warnings with graph paths + approve/decline; "Approve & Load to Neo4j" |
+| **Cleanup Review** | Plain-English corrections + compact before/after; warnings with graph paths + approve/decline; **Approve & Load** applies approved warning edits (lexicon node drop, duplicate merge, audit edge removal) then loads Neo4j |
 | **Pipeline Efficiency Tracking** | Table of **:PipelineRun** rows: LangSmith + telemetry tokens/cost, corrections/warnings counts, agent opt. version |
 | **Dashboard** | Momentum line (rolling heat), Payoff Matrix (long-gap props), Power shift (top 5 × 3 acts), protagonist regression warning; X/N scenes banner |
 | **Investigate** | Natural language → Cypher (`agent.py`) |

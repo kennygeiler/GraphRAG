@@ -15,7 +15,13 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from agent import ask_narrative_mri
-from cleanup_review import plain_english_fix_reason, summarize_graph_delta, warning_json_location
+from cleanup_review import (
+    apply_approved_warning_edits,
+    cleanup_warning_widget_id,
+    plain_english_fix_reason,
+    summarize_graph_delta,
+    warning_json_location,
+)
 from ingest import build_system_prompt, extract_scenes
 from langsmith_usage import aggregate_langsmith_usage
 from lexicon import build_master_lexicon
@@ -862,14 +868,14 @@ with tab_editor:
         if warnings_list:
             st.subheader(f"Warnings ({n_warnings})")
             st.caption(
-                "Approve = you accept this flag for the record. Decline = you judge it a false positive. "
-                "Either way the graph below is unchanged until you load to Neo4j; use this for your own QA trail."
+                "**Approve** queues that cleanup for the next **Approve & Load** (edits are applied in memory "
+                "immediately before Neo4j). **Decline** skips it. "
+                "Completeness warnings have no automatic graph edit."
             )
             for wi, w in enumerate(warnings_list):
                 if not isinstance(w, dict):
                     continue
-                wid = f"s{w.get('scene_number', 0)}_i{wi}_{w.get('check', 'x')}"
-                wid = "".join(c if c.isalnum() else "_" for c in wid)
+                wid = cleanup_warning_widget_id(w, wi)
                 loc = warning_json_location(w, entries)
                 check = w.get("check", "unknown")
                 detail = w.get("detail", "")
@@ -902,12 +908,31 @@ with tab_editor:
                 type="primary",
                 key="editor_approve_load",
             ):
-                with st.spinner("Loading into Neo4j…"):
+                with st.spinner("Applying approved cleanups & loading into Neo4j…"):
                     try:
-                        loaded = load_entries(entries_to_load)
+                        to_load, edit_log = apply_approved_warning_edits(
+                            entries_to_load,
+                            pr.get("warnings", []),
+                            wd,
+                        )
+                        if edit_log:
+                            with st.expander("Cleanup edits applied before load", expanded=True):
+                                for line in edit_log:
+                                    st.markdown(f"- {line}")
+                        loaded = load_entries(to_load)
                     except Exception as exc:
                         st.error(f"Load failed: {exc}")
                     else:
+                        pr["entries"] = to_load
+                        pr["warnings"] = [
+                            w
+                            for wi, w in enumerate(pr.get("warnings", []))
+                            if wd.get(cleanup_warning_widget_id(w, wi)) != "approved"
+                        ]
+                        for wi, w in enumerate(warnings_list):
+                            wid = cleanup_warning_widget_id(w, wi)
+                            if wd.get(wid) == "approved":
+                                wd.pop(wid, None)
                         st.cache_data.clear()
                         st.session_state["_flash"] = (
                             f"Loaded **{loaded}** scenes into Neo4j. Dashboard refreshed."
