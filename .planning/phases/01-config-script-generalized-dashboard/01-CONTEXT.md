@@ -41,6 +41,15 @@ Does **not** include empty-state hardening (Phase 2), reconciliation UX (Phase 3
 - **D-08:** User-facing labels use **Neo4j / lexicon / analysis result** naming everywhere tabs show character identity; avoid hardcoded production-specific proper names in operator-visible strings.
 - **D-09:** Regression warning stays **generic** (“primary lead” / “the lead”) with **resolved id/label** from analysis or override — no script-specific flavor text.
 
+### Primary lead selection rule (for Phase 1 implementation)
+
+- **D-10:** Use **one structural rule** already defined in product docs—no new “protagonist detector” heuristic.
+  - **Default primary lead:** the **#1 character** by **`get_top_characters_by_interaction_count(k=1)`** in `metrics.py` (same edge mix as **Power-shift cohort** in `strategy.md` §4: **CONFLICTS_WITH + USES + INTERACTS_WITH**, both directions). This is the character with the highest total narrative edge count; it matches how the dashboard already thinks about “who drives structural interaction load.”
+  - **Override:** if the operator sets an env pin (name TBD in plan), use that **Character `id`** as **primary** for the regression check instead of rank 1. If the pin is missing from the loaded graph / act matrix → **D-07** (notice, skip warning).
+  - **Cohort (“leads” plural for UI):** keep using **`get_top_characters_by_interaction_count(k)`** with **`k` from env** when implemented (**D-04**); the **primary** for regression is always **either** the pin **or** rank 1 from the **same** ranking function (do not mix unrelated metrics for primary vs cohort).
+  - **Ties:** ensure **deterministic** ordering when two characters share the same total (e.g. secondary sort by **`c.id` ascending**) so reruns and screenshots match.
+  - **Empty / no edges:** if the query returns **no** character with `tot > 0`, there is **no** analysis primary → **D-07**.
+
 ### Claude's Discretion
 
 - Exact env var names (`SCRIPTRAG_*` vs `SCRIPT_RAG_*`) — follow shortest consistent prefix and update `.env.example` once.
@@ -77,7 +86,7 @@ Does **not** include empty-state hardening (Phase 2), reconciliation UX (Phase 3
 ### Implementation touchpoints
 
 - `app.py` — all tabs: Pipeline, Cleanup Review, Efficiency, Dashboard, Investigate; `PROTAGONIST_ID`, `_protagonist_regression_warning`, `_extra` / act matrix, captions and chart copy
-- `metrics.py` — lead-ranking / top-character queries reused or extended for analysis-derived primary lead
+- `metrics.py` — **`get_top_characters_by_interaction_count`** (D-10) for primary lead and cohort; do not duplicate its Cypher for regression
 - `cleanup_review.py`, `agent.py`, `pipeline_runs.py` — user-visible copy only where script-specific
 - `.env.example` — override variable names (no secrets)
 

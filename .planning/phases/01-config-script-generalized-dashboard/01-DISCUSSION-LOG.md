@@ -77,3 +77,9 @@
 **User direction:** (1) **Leads discerned by analysis** (graph/metrics), not config-only; optional env/file **overrides**. (2) **GEN-01** applies to **all Streamlit tabs** and related operator-facing modules (`cleanup_review.py`, `agent.py`, `pipeline_runs.py` as needed)—not dashboard-only.
 
 **Files updated:** `01-CONTEXT.md`, `.planning/REQUIREMENTS.md`, `.planning/ROADMAP.md`, `.planning/PROJECT.md`.
+
+---
+
+## Amendment — primary lead rule (D-10)
+
+**Recommendation for plan-phase:** Default primary lead = **rank 1** from `get_top_characters_by_interaction_count` (same definition as Power-shift cohort in `strategy.md`). Env pin overrides; deterministic tie-break; empty result → D-07. Recorded in `01-CONTEXT.md` §D-10.
