@@ -164,8 +164,9 @@ def _render_pipeline_corrections(corrections: list[dict[str, Any]]) -> None:
     """Show fixer / follow-up repair trail where extraction happened (Pipeline tab)."""
     st.subheader("Self-healing corrections")
     st.caption(
-        "During **Stage 3**, some scenes needed a **rewrite** after validation reported errors. "
-        "This is the same graph the pipeline kept — nothing to approve here. Use **Verify** for **warnings** only."
+        "During **extraction**, some scenes needed a **fixer** pass after validation errors. "
+        "This is the graph the pipeline already committed—nothing to approve here. "
+        f"Use **{_VERIFY_TAB_LABEL}** only for **warnings** that still need a human decision."
     )
     for corr in corrections:
         if not isinstance(corr, dict):
@@ -381,10 +382,17 @@ st.set_page_config(
 
 # --------------- header ---------------------------------------------
 st.title("ScriptRAG")
-st.caption(
-    "Upload a screenplay, extract a knowledge graph with a self-healing AI pipeline, "
-    f"review corrections in **Pipeline**, **{_VERIFY_TAB_LABEL}** warnings, then explore the data."
-)
+if _PIPELINE_ENABLED:
+    st.caption(
+        "Upload a **Final Draft (.fdx)** screenplay, run a **self-healing AI pipeline** into a validated "
+        "**knowledge graph** (Neo4j). Inspect **automatic fixes** on **Pipeline**, resolve warnings in "
+        f"**{_VERIFY_TAB_LABEL}**, **approve & load**, then **query and export** in **Data out**."
+    )
+else:
+    st.caption(
+        f"**Pipeline** is hidden (`DISABLE_PIPELINE=1`). Use **{_VERIFY_TAB_LABEL}** with saved results, "
+        "**Data out** for schema and exports, **Reconcile** after load—turn **Pipeline** back on to extract in-app."
+    )
 
 if _flash := st.session_state.pop("_flash", None):
     st.success(_flash)
@@ -499,9 +507,10 @@ st.divider()
 if _PIPELINE_ENABLED and _active == "Pipeline":
         st.header("Pipeline")
         st.caption(
-            "Upload a Final Draft (.fdx) screenplay then run the full extraction pipeline. "
-            "Each scene runs **extract → validate ⇄ fix**, then follow-up checks and repair as needed. "
-            "Each finished run writes a **:PipelineRun** row to Neo4j (telemetry tokens and **estimated** USD from `etl_core/telemetry.py`)."
+            "Upload a **Final Draft (.fdx)** screenplay, then run the full extraction pipeline. "
+            "Each scene: **extract → validate ⇄ fix**, then **semantic auditors** and other follow-up checks "
+            "(gated patches may **auto-apply**; the rest become **Verify** warnings). "
+            "Each finished run writes a **:PipelineRun** row to Neo4j (per-stage tokens and **estimated** USD from `etl_core/telemetry.py`)."
         )
 
         _up = st.file_uploader(
@@ -515,52 +524,49 @@ if _PIPELINE_ENABLED and _active == "Pipeline":
             st.session_state["pipeline_source_fdx_name"] = _up.name
             st.success(f"Saved **{_TARGET_FDX.name}** ({len(_up.getvalue()):,} bytes)")
 
-        with st.expander("How does this pipeline thing even work?"):
+        with st.expander("How the pipeline works"):
             st.markdown("""
-**For each scene in your screenplay, the LangGraph engine runs:**
+**For each scene, LangGraph runs** `etl_core/graph_engine.py` **(screenplay wiring:** `extraction_graph` **+** `domains/screenplay/`**):**
 
 ```
- ┌─────────────────────────────────────────────────────────────┐
- │                    PER-SCENE PIPELINE                       │
- │                                                             │
- │  ┌───────────┐     Claude + Instructor                     │
- │  │  EXTRACT  │───▶ reads scene text, returns structured    │
- │  │  (1 LLM)  │     JSON: nodes + relationships + quotes   │
- │  └─────┬─────┘                                             │
- │        ▼                                                    │
- │  ┌───────────┐     Pure Python, zero cost, instant         │
- │  │ VALIDATE  │     7 deterministic checks:                 │
- │  │ (0 LLM)   │       - fabricated quote? (substring match) │
- │  │           │       - dangling node refs?                 │
- │  │           │       - self-referencing edges?             │
- │  │           │       - wrong node types on edges?          │
- │  │           │       - duplicate LOCATED_IN?               │
- │  │           │       + lexicon drift (warn only)           │
- │  │           │       + duplicate relationships (warn only) │
- │  └─────┬─────┘                                             │
- │        │                                                    │
- │   pass │    fail                                            │
- │        │  ┌──────────┐                                      │
- │        │  │  FIXER   │  Claude rewrites the broken graph   │
- │        │  │  (1 LLM) │  with the error message as context  │
- │        │  └────┬─────┘                                      │
- │        │       └──────▶ back to VALIDATE (up to 3x)        │
- │        ▼                                                    │
- │  ┌───────────────┐  Extra model passes + repair if        │
- │  │ FOLLOW-UP     │  needed (quote/structure checks;        │
- │  │ CHECKS        │  up to 2 repair cycles)                 │
- │  └───────┬───────┘                                         │
- │          ▼                                                  │
- │   validated scene graph                                     │
- └─────────────────────────────────────────────────────────────┘
+ ┌──────────────────────────────────────────────────────────────────┐
+ │                     PER-SCENE PIPELINE                           │
+ │                                                                  │
+ │   ┌───────────┐   Claude + instructor → `SceneGraph`-shaped JSON│
+ │   │  EXTRACT  │                                                  │
+ │   │  (1 LLM)  │                                                  │
+ │   └─────┬─────┘                                                  │
+ │         ▼                                                        │
+ │   ┌───────────┐   No LLM: **Pydantic** `SceneGraph` + rules     │
+ │   │ VALIDATE  │   • **Errors (→ fixer):** dangling ids, self-   │
+ │   │ (0 LLM)   │     ref edges, invalid kinds for rel types,     │
+ │   │           │     duplicate LOCATED_IN per character, quote    │
+ │   │           │     not in scene text (normalized substring)     │
+ │   │           │   • **Warnings (HITL later):** lexicon drift,    │
+ │   │           │     duplicate (source, target, type) tuples       │
+ │   └─────┬─────┘                                                  │
+ │         │ fail + retries left                                    │
+ │         ├──────────────────▶ ┌──────────┐                       │
+ │         │                    │  FIXER   │ Claude repair →       │
+ │         │                    │  (1 LLM) │ **VALIDATE** again    │
+ │         │                    └────┬─────┘ (max **3** attempts)  │
+ │         │                         └──────────▶ VALIDATE         │
+ │         │ pass                                                   │
+ │         ▼                                                        │
+ │   ┌───────────┐   With audit on (default here): **three** LLM   │
+ │   │   AUDIT   │   auditors in **one** graph step, then Python    │
+ │   │ (3 LLM)   │   `process_semantic_audit` — gated **auto-apply**│
+ │   └─────┬─────┘   or **warnings**. **No** extra LLM repair loop.│
+ │         ▼                                                        │
+ │   scene JSON + warnings / audit trail                            │
+ └──────────────────────────────────────────────────────────────────┘
 ```
 
-**Neo4j:** this tab only produces JSON + session state. **Verify → Approve & load** loads the graph.
+**Neo4j:** this tab only writes local JSON + session state. **`Audit & Verify` → Approve & load** persists the graph.
 
-**What "deterministic" means:** the first five error checks are plain Python — no AI.
-The hallucinated-quote check substring-matches each `source_quote` against the scene text.
+**Self-healing corrections** shows **fixer** rounds and **auditor_auto_apply** patches; the **Semantic audit decisions** expander mirrors **`audit_decisions.jsonl`**.
 
-**Telemetry $:** **Pipeline** / **Efficiency** show **estimated** USD from token counts × `etl_core/telemetry.py` rate table — not your invoice. Cost varies with script length and how often scenes need repair.
+**Telemetry $:** **estimated** USD from `etl_core/telemetry.py` — not your invoice; cost scales with script size and how often **fixer** runs.
 """)
 
         _fdx_n = 0
@@ -914,18 +920,29 @@ The hallucinated-quote check substring-matches each `source_quote` against the s
 if _active == _VERIFY_TAB_LABEL:
     st.header(_VERIFY_TAB_LABEL)
     st.caption(
-        "Review **warnings** from rules and semantic checks. **Approve** applies the listed edit before Neo4j load "
-        "(where supported); **Decline** skips it. Self-healing **corrections** are summarized in the **Pipeline** tab."
+        "Review **warnings** from deterministic rules and semantic audits. **Approve** applies the listed edit "
+        "before Neo4j load (where supported); **Decline** leaves the graph unchanged for that item. "
+        "Automatic **fixer** and **audit** trails are summarized under **Pipeline** → **Self-healing corrections**."
     )
     st.info(
-        "**Human-in-the-loop gate.** The **Pipeline** tab already ran validation and follow-up checks. "
-        "Here you judge each **warning** — then **Approve & load to Neo4j** commits the graph. "
-        "Next: optional **Reconcile**, then **Data out**."
+        "**Human-in-the-loop gate.** **Pipeline** already ran validation, fix loops, and auditor passes. "
+        "Here you decide each remaining **warning** — then **Approve & load to Neo4j** publishes the graph. "
+        "After load: **Data out** for recipe Cypher and CSV; **Reconcile** for optional duplicate **Character** / **Location** merges."
     )
 
     pr = st.session_state.get("pipeline_results")
     if not pr:
-        st.info("No pipeline results yet. Run the pipeline first.")
+        if _PIPELINE_ENABLED:
+            st.info(
+                "No pipeline results in this session yet. Run **Pipeline**, or use **Clear screenplay** only if you "
+                "intentionally reset after a run."
+            )
+        else:
+            st.info(
+                f"**Pipeline** is disabled (`DISABLE_PIPELINE=1`). **{_VERIFY_TAB_LABEL}** expects extraction output "
+                "from an in-app **Pipeline** run—this read-only layout has no way to create that session state here. "
+                "Use **Data out** or **Reconcile** if the graph is already in Neo4j; re-enable **Pipeline** to extract in-app."
+            )
     else:
         if "cleanup_warning_decisions" not in st.session_state:
             st.session_state["cleanup_warning_decisions"] = {}
@@ -1304,9 +1321,9 @@ if _active == _VERIFY_TAB_LABEL:
 if _active == "Reconcile":
     st.header("Reconcile")
     st.caption(
-        "**Optional — post-load entity hygiene.** Scan Neo4j for fuzzy duplicate **Character** / **Location** "
-        "names and **ghost** characters (single scene, no conflicts). Merges **rewrite the graph** — use "
-        "**dry-run** on the CLI when unsure."
+        "**Optional — after Approve & load to Neo4j.** Scan for fuzzy duplicate **Character** / **Location** names "
+        "and **ghost** characters (one scene, no conflicts). Merges **rewrite the graph** — use **`reconcile.py --dry-run`** "
+        "from the repo when unsure."
     )
     with st.expander("About reconciliation", expanded=False):
         st.markdown(
@@ -1451,9 +1468,9 @@ if _active == "Reconcile":
 if _active == "Data out":
     st.header("Data out")
     st.caption(
-        "After **Verify** (HITL) and **Approve & Load**, the screenplay lives as **structured graph data** "
-        "in Neo4j. Use this tab to **inspect the schema**, run **recipe Cypher** (read-only), and **download CSV** "
-        "for spreadsheets, warehouses, or demos."
+        f"After **{_VERIFY_TAB_LABEL}** and **Approve & load**, the loaded screenplay is **structured graph data** "
+        "in Neo4j. Inspect the **schema**, run fixed **recipe Cypher** (read-only), and **download CSV** for spreadsheets "
+        "or downstream tools. Structural analytics also live in **`metrics.py`** (CLI), not in this app."
     )
     st.markdown(graph_schema_card_markdown())
 
@@ -1462,8 +1479,8 @@ if _active == "Data out":
     _rc = _cached_rel_type_counts(_stamp_out)
     if not _lc and not _rc:
         st.info(
-            "No graph statistics yet — connect Neo4j, load from **Verify**, or check credentials. "
-            "Use **Reload Neo4j cache** in the sidebar after loads or external edits."
+            f"No graph statistics yet — connect Neo4j, complete **{_VERIFY_TAB_LABEL} → Approve & load**, "
+            "or check credentials. Use **Reload Neo4j cache** in the sidebar after loads or external edits."
         )
     else:
         c1, c2 = st.columns(2)
@@ -1552,9 +1569,9 @@ if _active == "Data out":
 if _active == "Pipeline Efficiency Tracking":
     st.header("Pipeline Efficiency Tracking")
     st.caption(
-        "**Agentic pipeline observability:** each finished run is a **:PipelineRun** row in Neo4j (survives screenplay reloads). "
-        "Totals plus **per-stage** extract / fix / audit tokens and estimated USD (see **strategy.md**, **Telemetry.md**). "
-        "**Script Name** is the uploaded screenplay’s original filename when you used the Pipeline uploader, otherwise the on-disk pipeline target (**target_script.fdx**)."
+        "**Per-run telemetry:** each finished pipeline creates a **:PipelineRun** node in Neo4j (kept when you **Clear screenplay**). "
+        "Columns show totals and **per-stage** extract / fix / audit tokens and estimated USD (details in **Telemetry.md**, **strategy.md**). "
+        "**Script Name** is the uploader’s original filename when you used **Pipeline**, otherwise the on-disk target (**target_script.fdx**)."
     )
     with st.expander("Token Agent / Telemetry version summary", expanded=False):
         st.markdown(
@@ -1575,7 +1592,8 @@ if _active == "Pipeline Efficiency Tracking":
 
     if not rows:
         st.info(
-            "No runs logged yet. Complete a pipeline run in the **Pipeline** tab (Neo4j must be reachable)."
+            "No runs logged yet. Complete a run in the **Pipeline** tab (Neo4j must be reachable), "
+            "or restore connectivity if you expected historical rows."
         )
     else:
         display: list[dict[str, Any]] = []

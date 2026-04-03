@@ -7,7 +7,7 @@
            screenplay structure you can measure.
 ```
 
-> upload a screenplay → self-healing AI extraction → human review → neo4j graph → export and query structured data. pacing, agency, and long-horizon props—with **verbatim quotes** on every narrative edge. built for writers who want **physics**, not vibes.
+> **final draft (.fdx)** → self-healing extraction → inspect fixes (**pipeline**) → **audit & verify** (HITL) → **approve & load** to neo4j → **data out** (cypher + csv). **verbatim quotes** on narrative edges; **metrics.py** (cli) for structural analytics—not in the streamlit tabs. built for writers who want **physics**, not vibes.
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Neo4j](https://img.shields.io/badge/Neo4j-graph-008cc1.svg)](https://neo4j.com/)
@@ -61,7 +61,7 @@ Follow once **Neo4j** and **`.env`** are set ([quick start](#quick-start)):
 7. **Data out** — Pick a **recipe query** or download **CSV**; the app stays on this section when you change the query (horizontal **Section** control, not browser tabs).
 8. **Pipeline Efficiency Tracking** — Inspect **:PipelineRun** history (tokens, cost, warnings).
 
-**Reset without losing runs:** Sidebar **Reset graph data** clears the screenplay graph and local pipeline JSON but keeps **`:PipelineRun`** rows for **Pipeline Efficiency Tracking**.
+**Reset without losing runs:** Sidebar **Clear screenplay & pipeline files** clears the screenplay graph in Neo4j and local pipeline JSON but keeps **`:PipelineRun`** rows for **Pipeline Efficiency Tracking**.
 
 ## table of contents
 

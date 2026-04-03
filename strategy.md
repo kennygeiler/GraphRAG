@@ -136,7 +136,7 @@ These definitions are what code should implement; if code diverges, fix code or 
 4. **Data out** — Schema card, live label/relationship counts, fixed **recipe Cypher** (parameterized), CSV downloads for narrative edges / characters / events (`data_out.py`).
 5. **Pipeline Efficiency Tracking** — Reads **`:PipelineRun`** from Neo4j. Column **Token Agent** shows **`v0`**, **`v1`**, … (from integer **`telemetry_version`**). **v0** legacy rows: per-stage **Tok E / F / A** and **$ E / F / A** display **N/A** (not tracked). Expander **Token Agent / Telemetry version summary** explains **v0–v3** and roadmap alignment.
 
-**Sidebar:** **Reload Neo4j cache** clears `@st.cache_data`. **Reset graph data** clears the screenplay graph in Neo4j and local pipeline JSON but keeps **:PipelineRun** rows.
+**Sidebar:** **Reload Neo4j cache** clears `@st.cache_data`. **Clear screenplay & pipeline files** clears the screenplay graph in Neo4j and local pipeline JSON but keeps **:PipelineRun** rows.
 
 **Cache:** Reconcile scan and Data out queries use `@st.cache_data` keyed on pipeline artifact mtimes (`validated_graph.json` / `pipeline_state.json` mtimes).
 
