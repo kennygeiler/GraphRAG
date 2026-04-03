@@ -17,9 +17,9 @@ Requirements for the **current planning milestone**: hardening, generalization, 
 
 - [x] **REC-01**: Reconciliation workflows in `reconcile.py` are exposed or documented for operator use at a defined scope (CLI and/or dashboard), with safe merge behavior consistent with existing patterns.
 
-### Analytics (Phase 3 slice)
+### Analytics (Phase 4)
 
-- [ ] **MET-01**: An initial **production complexity / cost signal** derived from graph density (or related structural stats) is available in a form consumable from the app or CLI, without replacing existing structural metrics.
+- [x] **MET-01**: An initial **production complexity / cost signal** derived from graph density (or related structural stats) is available in a form consumable from the app or CLI, without replacing existing structural metrics.
 
 ## v2 (deferred)
 
@@ -38,6 +38,6 @@ Requirements for the **current planning milestone**: hardening, generalization, 
 | GEN-01    | 1 | Done (2026-04-03) |
 | REL-01    | 2 | Done (2026-04-03) |
 | REC-01    | 3 | Done (2026-04-03) |
-| MET-01    | 4 | Not started |
+| MET-01    | 4 | Done (2026-04-04) |
 
 *Aligned with `.planning/ROADMAP.md` (coarse v1 track).*

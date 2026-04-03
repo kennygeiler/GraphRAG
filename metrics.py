@@ -30,7 +30,18 @@ __all__ = [
     "get_narrative_momentum_by_scene",
     "get_payoff_prop_timelines",
     "get_top_characters_by_interaction_count",
+    "get_structural_load_snapshot",
+    "NARRATIVE_REL_TYPES",
 ]
+
+# Typed narrative edges counted for structural load (MET-01); excludes IN_SCENE structural links.
+NARRATIVE_REL_TYPES: tuple[str, ...] = (
+    "INTERACTS_WITH",
+    "CONFLICTS_WITH",
+    "USES",
+    "LOCATED_IN",
+    "POSSESSES",
+)
 
 
 def _require_env(name: str) -> str:
@@ -806,6 +817,62 @@ def get_top_characters_by_interaction_count(
             drv.close()
 
 
+def _empty_structural_load_snapshot() -> dict[str, Any]:
+    return {
+        "scene_count": 0,
+        "character_count": 0,
+        "location_count": 0,
+        "prop_count": 0,
+        "narrative_edge_count": 0,
+        "structural_load_index": 0.0,
+    }
+
+
+def get_structural_load_snapshot(*, driver: Driver | None = None) -> dict[str, Any]:
+    """
+    MET-01 density proxy: counts :Event / entity nodes and narrative relationship instances
+    (`NARRATIVE_REL_TYPES`). **Structural load index** = narrative_edge_count / max(scene_count, 1).
+    Not a quality score — higher ≈ more typed graph edges to realize per scene on average.
+    """
+    own = driver is None
+    drv = driver or get_driver()
+    try:
+        with drv.session() as session:
+            rec = session.run(
+                """
+                OPTIONAL MATCH (ev:Event)
+                WITH count(ev) AS scene_count
+                OPTIONAL MATCH (ch:Character)
+                WITH scene_count, count(ch) AS character_count
+                OPTIONAL MATCH (loc:Location)
+                WITH scene_count, character_count, count(loc) AS location_count
+                OPTIONAL MATCH (pr:Prop)
+                WITH scene_count, character_count, location_count, count(pr) AS prop_count
+                OPTIONAL MATCH ()-[r]->()
+                WHERE type(r) IN $narr_types
+                WITH scene_count, character_count, location_count, prop_count, count(r) AS narrative_edge_count
+                RETURN scene_count, character_count, location_count, prop_count, narrative_edge_count
+                """,
+                narr_types=list(NARRATIVE_REL_TYPES),
+            ).single()
+        if not rec:
+            return _empty_structural_load_snapshot()
+        sc = int(rec["scene_count"] or 0)
+        ne = int(rec["narrative_edge_count"] or 0)
+        idx = (ne / sc) if sc > 0 else 0.0
+        return {
+            "scene_count": sc,
+            "character_count": int(rec["character_count"] or 0),
+            "location_count": int(rec["location_count"] or 0),
+            "prop_count": int(rec["prop_count"] or 0),
+            "narrative_edge_count": ne,
+            "structural_load_index": round(idx, 4),
+        }
+    finally:
+        if own:
+            drv.close()
+
+
 def _print_scene_heat_summary(rows: list[dict[str, Any]], *, top_dead: int = 8) -> None:
     with_heat = [r for r in rows if r["heat"] is not None]
     deadest = sorted(with_heat, key=lambda r: r["heat"])[:top_dead]
@@ -838,14 +905,37 @@ def main() -> None:
         action="store_true",
         help="Print scene heat table and dead-air highlights.",
     )
+    parser.add_argument(
+        "--structural-load",
+        action="store_true",
+        help="Print structural load snapshot (narrative edges / scene; MET-01).",
+    )
     args = parser.parse_args()
 
-    if not args.character and not args.props and not args.heat:
+    if not args.character and not args.props and not args.heat and not args.structural_load:
         args.heat = True
         args.props = True
 
     driver = get_driver()
     try:
+        if args.structural_load:
+            snap = get_structural_load_snapshot(driver=driver)
+            print("\n--- Structural load (production signal, MET-01) ---", flush=True)
+            print(
+                f"  Scenes: {snap['scene_count']}  "
+                f"Characters: {snap['character_count']}  "
+                f"Locations: {snap['location_count']}  Props: {snap['prop_count']}",
+                flush=True,
+            )
+            print(
+                f"  Narrative edges ({', '.join(NARRATIVE_REL_TYPES)}): {snap['narrative_edge_count']}",
+                flush=True,
+            )
+            print(
+                f"  Structural load index (edges / scene): {snap['structural_load_index']:.4f}",
+                flush=True,
+            )
+
         if args.character:
             p = get_passivity_score(args.character, driver=driver)
             if p is None:

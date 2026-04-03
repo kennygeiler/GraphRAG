@@ -13,7 +13,7 @@ This milestone takes ScriptRAG from Cinema Four–centric defaults and brittle d
 - [x] **Phase 1: Config & script-generalized dashboard** — Leads are **analysis-discerned** from the graph/metrics; optional env/project config **overrides**; script-agnostic copy across **all** Streamlit tabs (not dashboard-only).
 - [x] **Phase 2: Graph reliability & empty states** — Empty, partial, or schema-skewed Neo4j never takes down Streamlit metric paths.
 - [x] **Phase 3: Reconciliation for operators** — `reconcile.py` workflows are usable and documented at a defined scope with safe merge semantics.
-- [ ] **Phase 4: Production complexity signal** — Initial density- or structure-derived complexity/cost signal in app or CLI, alongside existing metrics.
+- [x] **Phase 4: Production complexity signal** — Initial density- or structure-derived complexity/cost signal in app or CLI, alongside existing metrics.
 
 ## Phase Details
 
@@ -58,7 +58,7 @@ This milestone takes ScriptRAG from Cinema Four–centric defaults and brittle d
   1. A complexity or production-cost-oriented signal derived from graph density (or closely related structural statistics) is visible in the Streamlit app and/or callable from a documented CLI path.
   2. Passivity, momentum, scene heat, payoff props, act buckets, power shift, and other existing structural metrics remain defined and presented as before; the new signal is additive.
   3. Operator can read the new signal next to existing dashboard analytics and understand that it reflects structural load/density, not a replacement “quality score.”
-**Plans**: TBD
+**Plans**: Implemented 2026-04-04 (`get_structural_load_snapshot`, Dashboard + `metrics.py --structural-load`; summary `04-01-SUMMARY.md`)
 **UI hint**: yes
 
 ## Progress
@@ -70,4 +70,4 @@ This milestone takes ScriptRAG from Cinema Four–centric defaults and brittle d
 | 1. Config & script-generalized dashboard | 2/2 | Complete | 2026-04-03 |
 | 2. Graph reliability & empty states | 1/1 | Complete | 2026-04-03 |
 | 3. Reconciliation for operators | 2/2 | Complete | 2026-04-03 |
-| 4. Production complexity signal | TBD | Not started | - |
+| 4. Production complexity signal | 1 (inline) | Complete | 2026-04-04 |

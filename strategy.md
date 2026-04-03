@@ -66,10 +66,10 @@ Use this as a checklist; flip items when reality changes.
 - [x] **Full script-agnostic UI (primary lead):** Regression uses `lead_resolution` — env override `SCRIPTRAG_PRIMARY_LEAD_ID` or analysis rank #1; cohort size `SCRIPTRAG_TOP_CHARACTERS`.
 - [x] **Graph reliability (REL-01):** Dashboard `@st.cache_data` Neo4j loaders return empty shapes on connection/query errors (`logging.exception`, no `st.*` in cache). Momentum / payoff / power-shift guard DataFrame columns and character ids. **`agent.py`** builds `Neo4jGraph` / `GraphCypherQAChain` lazily (`_get_chain()`); import does not require Neo4j env at load time. **Investigate** tab wraps chat errors; **Cleanup Review** uses safe dict access on corrections.
 - [x] **Reconciliation (REC-01):** **`run_reconciliation_scan`** + **`ReconciliationScan`** in `reconcile.py`; CLI **`--scope`** + **`--dry-run`**; README **Reconciliation** section; Streamlit **Reconcile** tab (cached scan, checkbox + pair picker before **`merge_characters` / `merge_entities`**).
+- [x] **Structural load (MET-01):** **`get_structural_load_snapshot`** in `metrics.py` (narrative edge counts + entity totals + **structural load index**); Dashboard metrics row; **`metrics.py --structural-load`**.
 
 ### Explicitly not started (roadmap)
 
-- **Phase 4 (v1 roadmap):** Production complexity / cost signal — **MET-01**.
 - **Exploratory (not v1 roadmap):** Sentiment or subtext on edges **only** if grounded in `source_quote` and secondary to structural metrics.
 
 ---
@@ -88,6 +88,7 @@ These definitions are what code should implement; if code diverges, fix code or 
 | **Act buckets (dashboard)** | **Equal thirds** of inclusive scene span `min(:Event.number)…max(:Event.number)` (`get_script_act_bounds` in `metrics.py`). Vertical markers on momentum chart at first scene of Act 2 and Act 3 when structurally distinct. |
 | **Primary-lead regression (UI)** | **Primary** = `SCRIPTRAG_PRIMARY_LEAD_ID` if set, else Character at rank **#1** by `get_top_characters_by_interaction_count(1)` (same edge mix as power-shift). If that id’s passivity in Act 3 **>** Act 1 → `st.warning` (fatal arc). If id missing from matrix or unresolved → informative message, no warning. |
 | **Load-bearing props** | Props with **≥2** total **USES** or **CONFLICTS_WITH** touches (after set-dressing filter in `metrics.py`). Used in older Chekhov-style CLI audits, not the Payoff Matrix chart. |
+| **Structural load index (MET-01)** | `narrative_edge_count / max(scene_count, 1)` where **narrative edges** are relationship instances with `type(r) ∈ {INTERACTS_WITH, CONFLICTS_WITH, USES, LOCATED_IN, POSSESSES}` (both directions counted as stored in Neo4j), and **scene_count** is `count(:Event)`. Additive production-density proxy in **Dashboard** and `metrics.py --structural-load`; not a quality score. |
 
 ---
 
@@ -99,9 +100,10 @@ These definitions are what code should implement; if code diverges, fix code or 
 
 1. **Pipeline** — Upload `.fdx`, run full extraction in-process (parse → lexicon → per-scene `extract_scenes()` with live progress). Stores results in `st.session_state`. On completion, writes a **`:PipelineRun`** row (efficiency metrics; in-app telemetry). Hidden when `DISABLE_PIPELINE=1`.
 2. **Cleanup Review** — Corrections: plain-English explanation + compact before/after (not full JSON). Warnings: pointer into extracted graph + per-warning approve/decline. "Approve & Load to Neo4j" calls `neo4j_loader.load_entries()` (graph wipe spares `:PipelineRun`).
-3. **Pipeline Efficiency Tracking** — Reads **`:PipelineRun`** from Neo4j (telemetry tokens/cost and run metadata).
-4. **Dashboard** — X/N scenes banner, **Momentum** (Plotly line + area, dashed act-boundary vlines), **Payoff Matrix** (horizontal span bars for long-gap props), **Power shift** (multi-line passivity across three act buckets), protagonist regression warning.
-5. **Investigate** — Narrative QA / Cypher path (`agent.py`).
+3. **Reconcile** — Ghost characters + fuzzy Character/Location pairs; optional merges (`reconcile.py`).
+4. **Pipeline Efficiency Tracking** — Reads **`:PipelineRun`** from Neo4j (telemetry tokens/cost and run metadata).
+5. **Dashboard** — X/N scenes banner, **Structural load** (MET-01: `get_structural_load_snapshot`), **Momentum** (Plotly line + area, dashed act-boundary vlines), **Payoff Matrix** (horizontal span bars for long-gap props), **Power shift** (multi-line passivity across three act buckets), primary-lead regression warning.
+6. **Investigate** — Narrative QA / Cypher path (`agent.py`).
 
 **Sidebar:** "Reload metrics" clears cache; "Nuke database" in expander for full resets.
 

@@ -2,41 +2,41 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: phase_complete
-stopped_at: Phase 3 executed (03-01, 03-02) — REC-01 shipped
-last_updated: "2026-04-03T22:00:00.000Z"
-last_activity: 2026-04-03 — execute-phase 3 — reconcile.py + app Reconcile tab
+status: milestone_complete
+stopped_at: Phase 4 executed — MET-01 shipped (v1 roadmap phases 1–4 done)
+last_updated: "2026-04-04T00:00:00.000Z"
+last_activity: 2026-04-04 — Phase 4 structural load snapshot + dashboard + CLI
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
-  percent: 75
+  completed_phases: 4
+  total_plans: 6
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-04-03)
+See: `.planning/PROJECT.md`
 
 **Core value:** End-to-end, evidence-backed structural analysis of a screenplay in a queryable graph—with pipeline, Neo4j, metrics, and investigation.
-**Current focus:** Phase 4 — Production complexity signal (MET-01)
+**Current focus:** v1 roadmap phases **1–4 complete**; next work = backlog / new milestone / MET refinements as needed.
 
 ## Current Position
 
-Phase: 4 of 4 (Production complexity signal) — next
-Plan: 0 of TBD in current phase
-Status: Phase 3 complete — REC-01 done (`03-01-SUMMARY.md`, `03-02-SUMMARY.md`)
-Last activity: 2026-04-03 — Phase 3 execute + docs sync
+Phase: 4 of 4 — **Complete**
+Plan: MET-01 delivered inline (see `04-01-SUMMARY.md`)
+Status: Milestone slice done — CONFIG/GEN/REL/REC/MET requirements satisfied for v1 track
+Last activity: 2026-04-04 — `get_structural_load_snapshot`, Dashboard, `metrics.py --structural-load`
 
-Progress: [███████░░░] 75%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 5
+- Total plans completed: 6
 - Average duration: —
 - Total execution time: —
 
@@ -54,20 +54,18 @@ Progress: [███████░░░] 75%
 
 ### Decisions
 
-Decisions are logged in `PROJECT.md` Key Decisions table. Recent decisions affecting current work:
-
-- Roadmap: Coarse 4-phase structure; CONFIG-01 + GEN-01 in Phase 1; REL-01 → 2; REC-01 → 3; MET-01 → 4.
+- Roadmap v1 track: Phases 1–4 complete; see `.planning/REQUIREMENTS.md` traceability table.
 
 ### Pending Todos
 
-None yet.
+None tracked in STATE.
 
 ### Blockers/Concerns
 
-None yet.
+None.
 
 ## Session Continuity
 
-Last session: 2026-04-03T22:00:00.000Z
-Stopped at: Phase 3 complete — next /gsd-discuss-phase 4 or /gsd-plan-phase 4
+Last session: 2026-04-04T00:00:00.000Z
+Stopped at: v1 four-phase roadmap executed
 Resume file: .planning/ROADMAP.md

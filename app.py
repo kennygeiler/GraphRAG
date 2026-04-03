@@ -33,6 +33,7 @@ from metrics import (
     get_passivity_in_scene_window,
     get_payoff_prop_timelines,
     get_script_act_bounds,
+    get_structural_load_snapshot,
     get_top_characters_by_interaction_count,
 )
 from neo4j_loader import load_entries
@@ -285,6 +286,27 @@ def _cached_event_count(_artifact_stamp: tuple[float, float]) -> int:
         except Exception:
             _log.exception("Cached event count failed")
             return 0
+    finally:
+        drv.close()
+
+
+@st.cache_data(ttl=120, show_spinner="Loading structural load snapshot…")
+def _cached_structural_load(_artifact_stamp: tuple[float, float]) -> dict[str, Any]:
+    del _artifact_stamp
+    drv = get_driver()
+    try:
+        try:
+            return get_structural_load_snapshot(driver=drv)
+        except Exception:
+            _log.exception("Cached structural load snapshot failed")
+            return {
+                "scene_count": 0,
+                "character_count": 0,
+                "location_count": 0,
+                "prop_count": 0,
+                "narrative_edge_count": 0,
+                "structural_load_index": 0.0,
+            }
     finally:
         drv.close()
 
@@ -574,6 +596,7 @@ if _primary_id:
 _extra = tuple(dict.fromkeys(_extra_ids))
 _act_matrix = _cached_act_passivity_matrix(_DASH_STAMP, _extra, _act_bounds_key)
 _event_count = _cached_event_count(_DASH_STAMP)
+_structural_load = _cached_structural_load(_DASH_STAMP)
 
 # --------------- header ---------------------------------------------
 st.title("ScriptRAG")
@@ -1296,6 +1319,29 @@ with tab_dashboard:
             "then **Approve & Load** to populate the dashboard."
         )
 
+    st.subheader("Structural load (production signal)")
+    st.caption(
+        "**MET-01 — additive** proxy: average count of **narrative** relationship instances "
+        "(`INTERACTS_WITH`, `CONFLICTS_WITH`, `USES`, `LOCATED_IN`, `POSSESSES`) per **:Event**. "
+        "Higher usually means more graph “physics” to produce per scene — **not** a quality or story score."
+    )
+    if _structural_load.get("scene_count", 0) == 0:
+        st.info("No :Event nodes — structural load appears after you load the graph.")
+    else:
+        sl = _structural_load
+        m1, m2, m3, m4, m5 = st.columns(5)
+        with m1:
+            st.metric("Load index (edges / scene)", f"{sl['structural_load_index']:.2f}")
+        with m2:
+            st.metric("Narrative edges", f"{sl['narrative_edge_count']:,}")
+        with m3:
+            st.metric("Characters", sl["character_count"])
+        with m4:
+            st.metric("Locations", sl["location_count"])
+        with m5:
+            st.metric("Props", sl["prop_count"])
+
+    st.divider()
     _render_momentum_chart(momentum_rows, _act_bounds)
     st.divider()
     _render_payoff_matrix(payoff_rows)

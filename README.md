@@ -161,7 +161,7 @@ wide-layout streamlit. six tabs (plus **pipeline** when enabled):
 | **cleanup review** | plain-english **corrections** (what broke + compact before/after summaries). **warnings** with graph paths + approve/decline for qa. **approve & load to neo4j**. |
 | **reconcile** | scan for **ghost-like characters** (single scene, no conflicts) and **fuzzy duplicate names** for `:Character` and `:Location`; optional confirmed **merges** (rewire relationships, keep one id). |
 | **pipeline efficiency tracking** | table of past runs from neo4j: scenes, corrections, warnings, telemetry tokens/cost, agent opt. version. |
-| **dashboard** | **narrative momentum** (per-scene heat = `CONFLICTS_WITH / (INTERACTS_WITH + CONFLICTS_WITH)`, 3-scene rolling mean, dashed act boundaries), **payoff matrix** (long-horizon props > 10 scene gap), **power shift** (passivity index for top 5 characters by act). x/n scenes banner. `st.warning` if protagonist regresses. |
+| **dashboard** | **structural load** (MET-01: narrative edges per scene + entity counts), **narrative momentum** (per-scene heat = `CONFLICTS_WITH / (INTERACTS_WITH + CONFLICTS_WITH)`, 3-scene rolling mean, dashed act boundaries), **payoff matrix** (long-horizon props > 10 scene gap), **power shift** (passivity index for top 5 characters by act). x/n scenes banner. `st.warning` if protagonist regresses. |
 | **investigate** | ask questions about the script's structure via natural language → cypher (`agent.py`). |
 
 pipeline tab is hidden when `DISABLE_PIPELINE=1` (read-only deployments).
@@ -186,6 +186,16 @@ uv run python reconcile.py --scope locations
 ```
 
 use **`--scope all`** (default) for ghosts + character pairs + location pairs. requires the same **`NEO4J_*`** env vars as the rest of the app. the **reconcile** tab in streamlit runs the same scan and supports **explicit checkbox + per-pair merge** if you prefer the ui.
+
+### structural load (MET-01)
+
+density-style **production signal** from neo4j: counts of `:Character` / `:Location` / `:Prop` / `:Event` and instances of narrative rel types (`INTERACTS_WITH`, `CONFLICTS_WITH`, `USES`, `LOCATED_IN`, `POSSESSES`). **load index** = narrative edges ÷ scene count. cli:
+
+```bash
+uv run python metrics.py --structural-load
+```
+
+same numbers appear on the **dashboard** tab (cached with other metrics).
 
 ## quick start
 

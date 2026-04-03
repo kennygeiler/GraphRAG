@@ -28,7 +28,7 @@ End-to-end, **evidence-backed** structural analysis of a screenplay in a queryab
 
 - [ ] **Empty / partial graph hardening** — clear user messaging; no uncaught KeyErrors or broken DataFrame paths when Neo4j or artifacts are missing or incomplete (`strategy.md` §6).
 - [x] **Reconciliation at scale** — expand `reconcile.py` usage from CLI/dashboard with safe merge patterns documented in UI (`strategy.md` §6). (REC-01: `run_reconciliation_scan`, CLI `--scope`, README, Streamlit **Reconcile** tab.)
-- [ ] **Phase 3 complexity signals** — initial production-oriented overlays from graph density without diluting structural truth (`strategy.md` §3 roadmap).
+- [x] **Phase 3 complexity signals** — initial production-oriented overlays from graph density without diluting structural truth (`strategy.md` §3 roadmap). (MET-01: `get_structural_load_snapshot`, Dashboard + CLI.)
 
 ### Out of Scope
 
