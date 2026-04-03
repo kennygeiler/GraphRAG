@@ -407,7 +407,8 @@ if _PIPELINE_ENABLED and _active == "Pipeline":
         st.header("Pipeline")
         st.caption(
             "Upload a Final Draft (.fdx) screenplay then run the full extraction pipeline. "
-            "Each scene runs **extract → validate → fix → optional LLM audit**; metrics are saved to Neo4j after each run."
+            "Each scene runs **extract → validate ⇄ fix** and, if **Enable LLM auditors** is on, **audit ⇄ audit fixer**. "
+            "Each finished run writes a **:PipelineRun** row to Neo4j (telemetry tokens and **estimated** USD from `etl_core/telemetry.py`)."
         )
 
         _up = st.file_uploader(
@@ -422,7 +423,7 @@ if _PIPELINE_ENABLED and _active == "Pipeline":
 
         with st.expander("How does this pipeline thing even work?"):
             st.markdown("""
-**For each scene in your screenplay, the pipeline runs this loop:**
+**For each scene in your screenplay, the LangGraph engine runs:**
 
 ```
  ┌─────────────────────────────────────────────────────────────┐
@@ -451,33 +452,25 @@ if _PIPELINE_ENABLED and _active == "Pipeline":
  │        │  └────┬─────┘                                      │
  │        │       └──────▶ back to VALIDATE (up to 3x)        │
  │        ▼                                                    │
- │  ┌───────────────┐  Optional: 3 specialized Claude calls   │
- │  │ LLM AUDITORS  │  that review the extraction:            │
- │  │  (3 LLM)      │    - Quote Fidelity: does quote prove  │
- │  │               │      the relationship type?             │
- │  │               │    - Completeness: any interactions     │
- │  │               │      missing from the graph?            │
- │  │               │    - Attribution: source/target right?  │
+ │  ┌───────────────┐  If checkbox ON: 3 Claude calls        │
+ │  │ LLM AUDITORS  │  (quote fidelity, completeness,         │
+ │  │  (3 LLM)      │   attribution). If OFF, skip this box.   │
  │  └───────┬───────┘                                         │
  │          │                                                  │
- │     pass │    fail -> FIXER again (up to 2x)               │
+ │     pass │    fail -> AUDIT FIXER -> AUDIT (up to 2x)      │
  │          ▼                                                  │
  │   validated scene graph                                     │
  └─────────────────────────────────────────────────────────────┘
 ```
 
-**What "deterministic" means:** checks 1-5 are plain Python -- no AI, no randomness.
-They compare strings and sets. The hallucinated-quote check is the most powerful:
-it does an exact substring search of each `source_quote` against the raw scene text.
-If Claude made up a quote, this catches it every time, for free.
+**Neo4j:** this tab only produces JSON + session state. **Verify → Approve & load** loads the graph.
 
-**What the LLM auditors add:** three separate Claude calls that catch *semantic*
-errors the deterministic layer can't (e.g. a quote exists in the text but doesn't
-actually prove the tagged relationship type). These are optional -- uncheck the
-checkbox below to skip them for faster runs.
+**What "deterministic" means:** the first five error checks are plain Python — no AI.
+The hallucinated-quote check substring-matches each `source_quote` against the scene text.
 
-**Cost:** ~$0.01/scene without auditors, ~$0.03/scene with auditors.
-For an 86-scene script: **~$0.85 fast** or **~$2.50 full audit**.
+**LLM auditors:** optional — uncheck **Enable LLM auditors** for deterministic-only passes (faster).
+
+**Telemetry $:** **Pipeline** / **Efficiency** show **estimated** USD from token counts × `etl_core/telemetry.py` rate table — not your invoice. Ballpark for ~86 scenes: **~$0.85** without auditors vs **~$2.50** with — depends on length and retries.
 """)
 
         col_opt1, col_opt2 = st.columns(2)

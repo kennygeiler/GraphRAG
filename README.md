@@ -19,7 +19,7 @@
 
 coverage is subjective. "does act two drag?" "is my protagonist reactive?" "did we forget the gun?" you get opinions. you don't get **reproducible** answers tied to the actual script.
 
-**scriptrag** turns a screenplay into a **queryable graph**: who conflicts with whom, in which scene, with **proof text** on the relationship. from that graph you compute **momentum** (rolling friction), **passivity by act**, and **long-arc props**.
+**scriptrag** turns a screenplay into a **queryable graph**: who conflicts with whom, in which scene, with **proof text** on the relationship. once the graph is in neo4j, **`metrics.py` / CLI** give reproducible **momentum**, **passivity-by-act windows**, **long-arc (payoff) props**, structural load, and more — the streamlit app focuses on extraction, verify, exports, and efficiency, not those charts.
 
 full detail lives in [`strategy.md`](strategy.md). quick context: [`MEMORY.md`](MEMORY.md). agents: [`AGENTS.md`](AGENTS.md).
 
@@ -84,87 +84,74 @@ Follow once **Neo4j** and **`.env`** are set ([quick start](#quick-start)):
 |------|--------|----------------|
 | **parse** | `parser.py` | `.fdx` xml → `raw_scenes.json`. **no llm.** |
 | **lexicon** | `lexicon.py` | whole script text → claude + pydantic → `master_lexicon.json` (stable `snake_case` ids). |
-| **ingest** | `ingest.py` + `schema.py` | **per scene**: claude + **instructor** → `SceneGraph`; two-phase self-healing (deterministic rules → llm auditors); edges need `source_id`, `target_id`, `type`, **`source_quote`**. |
-| **load** | `neo4j_loader.py` | merge `:Character` `:Location` `:Prop` `:Event`, `IN_SCENE`, narrative rels. |
-| **analyze** | `metrics.py` | parameterized cypher → momentum, payoff props, passivity windows, etc. |
-| **ui** | `app.py` | streamlit: pipeline, verify, reconcile, **data out**, pipeline efficiency (section radio + cached neo4j reads). |
+| **ingest** | `ingest.py` + `schema.py` | **per scene**: claude + **instructor** → `SceneGraph`; **validate** (pydantic + 7 rules) ⇄ **fixer** (llm, up to 3); **optional** llm auditors + audit fixer (up to 2) when enabled. edges need `source_id`, `target_id`, `type`, **`source_quote`**. |
+| **load** | `neo4j_loader.py` | merge `:Character` `:Location` `:Prop` `:Event`, `IN_SCENE`, narrative rels. invoked from streamlit **verify** (**approve & load**) or headless after `ingest.py`. |
+| **analyze** | `metrics.py` | **cli / library** — parameterized cypher (momentum, payoff props, passivity windows, structural load, etc.). **not** used by streamlit tabs. |
+| **ui** | `app.py` | streamlit: pipeline, verify, reconcile, **data out**, pipeline efficiency (section radio + cached neo4j reads). **data out** uses `data_out.py` cypher, not `metrics.py`. |
 
-neo4j does **not** read english. it stores **nodes and edges**. streamlit asks **metrics**; metrics ask **cypher**.
+neo4j does **not** read english. it stores **nodes and edges**. after load, **data out** and **reconcile** query neo4j directly; **`metrics.py`** is for terminal analytics and custom scripts.
 
 ### the pipeline
+
+**file flow:** `.fdx` → `parser.py` → `raw_scenes.json` → `lexicon.py` → `master_lexicon.json` → `ingest.py` (per-scene langgraph) → **`validated_graph.json`** on disk. a streamlit **pipeline** run also holds results in **`st.session_state`** until reset.
+
+**per scene (`etl_core/graph_engine.py`):** **extract** → **validate** (pydantic + 7 rules) ⇄ **fixer** (llm repair, up to **3** validate/fix rounds). if **llm auditors** are enabled (pipeline checkbox or `enable_audit=True`): after validate passes → **audit** (three claude calls, bundled) ⇄ **audit_fixer** (up to **2** rounds). if auditors are **disabled**, validate pass **ends** the graph — **no** audit step.
+
+**into neo4j:** extraction **does not** load neo4j. **streamlit:** **verify → approve & load** → `neo4j_loader.load_entries()`. **headless:** `uv run python neo4j_loader.py` after `ingest.py`.
+
+**downstream:** **data out** / **reconcile** / **efficiency** use `data_out.py`, `reconcile.py`, `pipeline_runs.py`. **`metrics.py`** is **cli-only** from the app’s perspective.
 
 ```
   FDX              PARSER              RAW JSON
    │                  │                    │
-   │  screenplay.xml │                    │
    └─────────────────▶│  ElementTree       │
                       │  scenes + text     │
                       └─────────┬──────────┘
-                                │
                                 ▼
                       ┌─────────────────┐
                       │  LEXICON        │◀── claude + pydantic
-                      │  (all scenes)   │     master cast/locs
+                      │  (all scenes)   │
                       └────────┬────────┘
-                               │
                                ▼
                       ┌─────────────────────────────────────┐
-                      │  INGEST (per scene)                 │
+                      │  INGEST (per scene, LangGraph)      │
                       │                                     │
-                      │  ┌───────────┐                      │
-                      │  │ EXTRACT   │◀── claude+instructor │
-                      │  └─────┬─────┘                      │
-                      │        ▼                             │
-                      │  ┌───────────┐    ┌────────┐        │
-                      │  │ VALIDATE  │───▶│ FIXER  │──┐     │
-                      │  │ 7 rules   │◀───┘        │  │     │
-                      │  └─────┬─────┘   (×3 max)  │  │     │
-                      │        │ pass              ◀──┘     │
-                      │        ▼                             │
-                      │  ┌───────────────────────┐          │
-                      │  │ LLM AUDITORS (×3)     │          │
-                      │  │ quote fidelity         │          │
-                      │  │ completeness           │          │
-                      │  │ attribution            │          │
-                      │  └─────┬─────────────────┘          │
-                      │        │ errors? → fixer (×2 max)   │
-                      │        │ warnings → human review    │
-                      │        ▼                             │
-                      │  validated scene graph               │
-                      └────────┬────────────────────────────┘
-                               │
-                               ▼
-               validated_graph.json (checkpointed)
-                               │
-                               ▼
-                      ┌─────────────────┐
-                      │  NEO4J LOADER   │
-                      │  MERGE graph    │
-                      └────────┬────────┘
-                               │
-                               ▼
-                      ┌─────────────────┐
-                      │  NEO4J          │
-                      │  bolt / aura    │
-                      └────────┬────────┘
-                               │
-                               ▼
-                      ┌─────────────────┐
-                      │  STREAMLIT      │
-                      │  app.py         │
-                      │  (→ metrics.py) │
-                      └─────────────────┘
+                      │  EXTRACT ──▶ VALIDATE ⇄ FIXER       │
+                      │                    (≤3)            │
+                      │                      │ pass         │
+                      │                      ▼             │
+                      │              [if auditors ON]     │
+                      │              AUDIT ⇄ AUDIT_FIXER  │
+                      │                    (≤2)            │
+                      │                      ▼             │
+                      │              scene graph JSON       │
+                      └─────────────────┬───────────────────┘
+                                        ▼
+                         validated_graph.json (+ UI session)
+                                        │
+              ┌─────────────────────────┴──────────────────────────┐
+              ▼                                                    ▼
+   streamlit VERIFY → neo4j_loader                         headless neo4j_loader.py
+   (approve & load)                                         after ingest.py
+              │                                                    │
+              └─────────────────────────┬──────────────────────────┘
+                                        ▼
+                                     NEO4J
+                                        │
+              ┌─────────────────────────┴──────────────────────────┐
+              ▼                                                    ▼
+   app: data out · reconcile · efficiency                   metrics.py (CLI)
 ```
 
 **important corrections** vs a lazy "ai tags the script" story:
 
 - **`parser.py` never calls an api.** only **`lexicon.py`** and **`ingest.py`** use the model for extraction.
 - pydantic + instructor **enforce** edge shape; bad structured output **retries or fails**—it doesn't silently save junk.
-- the **editor agent** doesn't just check schemas—it runs a **two-phase validation** on every scene. see below.
+- **deterministic validation + optional fixer** run on every scene; **llm auditors** are an **optional** second phase when enabled. see below.
 
 ### the editor agent (self-healing extraction)
 
-every scene goes through two layers of validation before it's accepted. the pipeline keeps looping until the graph is clean or retries are exhausted—you see every correction in the ui.
+every scene runs **deterministic validation** (and the **fixer** llm when validation fails) until pass or max retries—you see corrections in the **pipeline** tab. **llm auditors** are a **separate optional pass** after validation succeeds (pipeline checkbox **enable llm auditors**, default on in the ui).
 
 **phase 1 — deterministic rules** (zero llm cost, instant):
 
@@ -180,7 +167,7 @@ every scene goes through two layers of validation before it's accepted. the pipe
 
 errors trigger the **fixer** (up to 3 retries). warnings are saved for human review but don't block the pipeline.
 
-**phase 2 — llm auditor agents** (3 specialized claude calls per scene):
+**phase 2 — llm auditor agents** (optional; **3** specialized claude calls per scene when enabled):
 
 | agent | what it does |
 |-------|-------------|
@@ -188,9 +175,9 @@ errors trigger the **fixer** (up to 3 retries). warnings are saved for human rev
 | **completeness** | reads the raw scene text and compares it to the extracted graph—finds significant interactions, conflicts, or prop uses the extractor missed |
 | **attribution** | verifies `source_id` and `target_id` are the correct entities for the action described in each quote—catches swapped source/target |
 
-audit errors trigger the fixer (up to 2 retries, separate from phase 1). audit warnings go to **verify** for human review.
+audit **errors** trigger the **audit fixer** (up to 2 retries, separate from phase-1 fixer). audit **warnings** go to **verify** for human review.
 
-**cost:** ~$0.03/scene worst case (extraction + fixer + 3 auditors + audit fixer). deterministic checks are free. for an 86-scene script, roughly **$2.50 total**.
+**telemetry “cost” (usd):** the app sums **estimated** spend from token counts × a static **$/1m** table in **`etl_core/telemetry.py`** (`estimate_cost`) — **not** your anthropic invoice. actual spend depends on model, pricing changes, and retries. **pipeline** / **efficiency** show those estimates per run. rough **order-of-magnitude** examples (86 scenes, typical lengths): **~$0.01/scene** without auditors vs **~$0.03/scene** with auditors — often **~$0.85** vs **~$2.50** total — treat as **ballparks**, not guarantees.
 
 ## streamlit app
 
@@ -236,8 +223,6 @@ density-style **production signal** from neo4j: counts of `:Character` / `:Locat
 ```bash
 uv run python metrics.py --structural-load
 ```
-
-use **`uv run python metrics.py --structural-load`** for the same snapshot from the CLI.
 
 ## quick start
 
@@ -349,13 +334,13 @@ GraphRAG/
 │   ├── state.py               #   langgraph ETLState (tokens, cost, audit)
 │   ├── telemetry.py           #   anthropic pricing + accumulate_usage
 │   ├── errors.py              #   MaxRetriesError
-│   └── graph_engine.py        #   langgraph: extract → validate → fix → audit → audit_fix
+│   └── graph_engine.py        #   langgraph: extract → validate ⇄ fix; + audit ⇄ audit_fix if auditors on
 ├── domains/
 │   └── screenplay/            # screenplay-specific domain plug-in
 │       ├── schemas.py         #   re-exports SceneGraph, Relationship
 │       ├── rules.py           #   7 deterministic checks (no AI)
 │       ├── auditors.py        #   3 LLM auditor agents (quote fidelity, completeness, attribution)
-│       └── adapter.py         #   DomainBundle wiring LLM + rules + auditors
+│       └── adapter.py         #   DomainBundle: extract/fix + rules; audit_llm when enable_audit
 ├── parser.py                  # .fdx → raw_scenes.json (xml only)
 ├── lexicon.py                 # claude → master_lexicon.json
 ├── ingest.py                  # per-scene extraction (exports extract_scenes generator)
