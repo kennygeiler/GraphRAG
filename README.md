@@ -148,18 +148,18 @@ errors trigger the **fixer** (up to 3 retries). warnings are saved for human rev
 | **completeness** | reads the raw scene text and compares it to the extracted graph—finds significant interactions, conflicts, or prop uses the extractor missed |
 | **attribution** | verifies `source_id` and `target_id` are the correct entities for the action described in each quote—catches swapped source/target |
 
-audit errors trigger the fixer (up to 2 retries, separate from phase 1). audit warnings go to **cleanup review** for human review.
+audit errors trigger the fixer (up to 2 retries, separate from phase 1). audit warnings go to **verify** for human review.
 
 **cost:** ~$0.03/scene worst case (extraction + fixer + 3 auditors + audit fixer). deterministic checks are free. for an 86-scene script, roughly **$2.50 total**.
 
 ## dashboard
 
-wide-layout streamlit. six tabs (plus **pipeline** when enabled):
+wide-layout streamlit. seven primary tabs (plus **pipeline** when enabled):
 
 | tab | what it is |
 |-----|------------|
-| **pipeline** | upload `.fdx`, run full extraction in-process with live per-scene progress; pass/fix/fail status; telemetry metrics; saves a **:PipelineRun** row in neo4j after each run. |
-| **cleanup review** | plain-english **corrections** (what broke + compact before/after summaries). **warnings** with graph paths + approve/decline for qa. **approve & load to neo4j**. |
+| **pipeline** | upload `.fdx`, run full extraction in-process (live progress, telemetry); saves **:PipelineRun** in neo4j. after a run: **self-healing corrections** (why validation failed, before/after summaries). |
+| **verify** | **warnings** only — check title, what **approve** does, json path; **approve & load** applies edits then loads neo4j. |
 | **reconcile** | optional **post-load** hygiene: **ghost-like characters** (single scene, no conflicts) and **fuzzy duplicate names** for `:Character` and `:Location`; optional confirmed **merges** (rewire relationships, keep one id). |
 | **data out** | **manipulable data** after load: schema card, live node-label / rel-type counts, fixed **recipe cypher** (read-only), **csv** downloads (narrative edges, characters, events). |
 | **pipeline efficiency tracking** | table of past runs from neo4j: scenes, corrections, warnings, telemetry tokens/cost, agent opt. version. |
@@ -213,7 +213,7 @@ cp .env.example .env
 uv run streamlit run app.py
 ```
 
-open **http://localhost:8501**. upload your `.fdx` in the **pipeline** tab and click **run pipeline**. review **cleanup review**, then approve to load into neo4j.
+open **http://localhost:8501**. upload your `.fdx` in the **pipeline** tab and click **run pipeline**. use **verify** for warnings, then approve to load into neo4j.
 
 ### cli alternative (headless)
 

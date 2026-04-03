@@ -245,8 +245,8 @@ def extract_scenes(
             graph_entry=entry,
             audit_entries=audit_entries,
             warnings=pipe_warnings,
-            tokens=telem.get("total_tokens", 0),
-            cost=telem.get("total_cost", 0.0),
+            tokens=int(telem.get("total_tokens", 0) or 0),
+            cost=float(telem.get("total_cost", 0.0) or 0.0),
         )
 
 

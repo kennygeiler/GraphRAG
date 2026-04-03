@@ -55,7 +55,7 @@ Use this as a checklist; flip items when reality changes.
 - [x] **Neo4j loader** (merge events, entities, `IN_SCENE`, narrative edges with quotes).
 - [x] **Metrics layer** (`metrics.py`): passivity (global and windowed), scene heat, load-bearing props, possessed-unused, Act I→III Chekhov-style audit, scene inspector quotes, character `IN_SCENE` counts.
 - [x] **Scene heat refinement:** numerator = **distinct unordered conflict pairs** in-scene (not raw `CONFLICTS_WITH` edge count) to reduce dialogue-bloat skew.
-- [x] **Streamlit dashboard** (`app.py`): **ScriptRAG** — **Pipeline** (upload FDX, in-process extraction; persists **:PipelineRun**), **Cleanup Review** (corrections as plain English + compact before/after; warnings with JSON path + approve/decline; approve & load to Neo4j), **Reconcile** (`reconcile.py` scan + optional confirmed merges; ghosts + fuzzy Character/Location pairs), **Pipeline Efficiency Tracking** (table from Neo4j; telemetry token/cost), **Dashboard** (structural load MET-01, momentum, payoff matrix, power shift, X/N scenes, **primary-lead** regression warning), **Investigate** (ask the graph).
+- [x] **Streamlit dashboard** (`app.py`): **ScriptRAG** — **Pipeline** (upload FDX, in-process extraction; persists **:PipelineRun**; self-healing **corrections** shown here), **Verify** (warnings with guidance + approve/decline; approve & load to Neo4j), **Reconcile** (`reconcile.py` scan + optional confirmed merges; ghosts + fuzzy Character/Location pairs), **Pipeline Efficiency Tracking** (table from Neo4j; telemetry token/cost), **Dashboard** (structural load MET-01, momentum, payoff matrix, power shift, X/N scenes, **primary-lead** regression warning), **Investigate** (ask the graph).
 - [x] **Self-healing ETL pipeline:** `etl_core` LangGraph engine (extract → validate → fix loop), `ingest.py` exports `extract_scenes()` generator, Streamlit consumes it with live per-scene progress.
 - [x] **Ask the graph** chat path (`agent.py`).
 - [x] **Utilities:** `debug_export.py` → `graph_qa_dump.json`; `qa_entities.py` → `data_health_report.json`.
@@ -64,7 +64,7 @@ Use this as a checklist; flip items when reality changes.
 
 - [x] **Timeline empty states:** Narrative Timeline charts guard empty Cypher results and missing columns.
 - [x] **Full script-agnostic UI (primary lead):** Regression uses `lead_resolution` — env override `SCRIPTRAG_PRIMARY_LEAD_ID` or analysis rank #1; cohort size `SCRIPTRAG_TOP_CHARACTERS`.
-- [x] **Graph reliability (REL-01):** Dashboard `@st.cache_data` Neo4j loaders return empty shapes on connection/query errors (`logging.exception`, no `st.*` in cache). Momentum / payoff / power-shift guard DataFrame columns and character ids. **`agent.py`** builds `Neo4jGraph` / `GraphCypherQAChain` lazily (`_get_chain()`); import does not require Neo4j env at load time. **Investigate** tab wraps chat errors; **Cleanup Review** uses safe dict access on corrections.
+- [x] **Graph reliability (REL-01):** Dashboard `@st.cache_data` Neo4j loaders return empty shapes on connection/query errors (`logging.exception`, no `st.*` in cache). Momentum / payoff / power-shift guard DataFrame columns and character ids. **`agent.py`** builds `Neo4jGraph` / `GraphCypherQAChain` lazily (`_get_chain()`); import does not require Neo4j env at load time. **Investigate** tab wraps chat errors; **Verify** uses safe dict access on pipeline results.
 - [x] **Reconciliation (REC-01):** **`run_reconciliation_scan`** + **`ReconciliationScan`** in `reconcile.py`; CLI **`--scope`** + **`--dry-run`**; README **Reconciliation** section; Streamlit **Reconcile** tab (cached scan, checkbox + pair picker before **`merge_characters` / `merge_entities`**).
 - [x] **Structural load (MET-01):** **`get_structural_load_snapshot`** in `metrics.py` (narrative edge counts + entity totals + **structural load index**); Dashboard metrics row; **`metrics.py --structural-load`**.
 
@@ -99,7 +99,7 @@ These definitions are what code should implement; if code diverges, fix code or 
 **Top-level tabs**
 
 1. **Pipeline** — Upload `.fdx`, run full extraction in-process (parse → lexicon → per-scene `extract_scenes()` with live progress). Stores results in `st.session_state`. On completion, writes a **`:PipelineRun`** row (efficiency metrics; in-app telemetry). Hidden when `DISABLE_PIPELINE=1`.
-2. **Cleanup Review** — Corrections: plain-English explanation + compact before/after (not full JSON). Warnings: pointer into extracted graph + per-warning approve/decline. "Approve & Load to Neo4j" calls `neo4j_loader.load_entries()` (graph wipe spares `:PipelineRun`).
+2. **Verify** — Warnings only: human-readable check title + guidance, JSON path, per-warning approve/decline. Self-healing **corrections** (fixer before/after) appear in **Pipeline**. "Approve & Load to Neo4j" calls `neo4j_loader.load_entries()` (graph wipe spares `:PipelineRun`).
 3. **Reconcile** — Optional **post-load** hygiene: ghost characters + fuzzy Character/Location pairs; optional merges (`reconcile.py`).
 4. **Data out** — Schema card, live label/relationship counts, fixed **recipe Cypher** (parameterized), CSV downloads for narrative edges / characters / events (`data_out.py`). Demos **manipulable data** after HITL load.
 5. **Pipeline Efficiency Tracking** — Reads **`:PipelineRun`** from Neo4j (telemetry tokens/cost and run metadata).
@@ -110,7 +110,7 @@ These definitions are what code should implement; if code diverges, fix code or 
 
 **Cache:** Dashboard queries use `@st.cache_data` keyed on pipeline artifact mtimes; "Reload metrics" clears cache.
 
-**Demo layout:** Optional env **`SCRIPTRAG_DEMO_LAYOUT`** — when set, tabs 3–4 become **Data out** then **Reconcile** (default production order is the reverse).
+**Demo layout:** Optional env **`SCRIPTRAG_DEMO_LAYOUT`** — when set, tabs 3–4 become **Data out** then **Reconcile** (default production order is the reverse). **Reset dashboard data** clears the screenplay graph in Neo4j but keeps **:PipelineRun** rows.
 
 ---
 

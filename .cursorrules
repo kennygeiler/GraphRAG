@@ -11,7 +11,7 @@
 - **Input:** `.fdx` (Final Draft) → `raw_scenes.json` → lexicon → `validated_graph.json`.
 - **Graph:** Neo4j — `Character`, `Location`, `Prop`, `Event`; `IN_SCENE` + narrative rels with quotes.
 - **Extraction:** Claude via `instructor` + Pydantic (`schema.py`). Self-healing pipeline: extract → validate → fix (up to 3 retries) via `etl_core` LangGraph engine.
-- **Dashboard (`app.py`):** **ScriptRAG** (wide layout). Tabs: **Pipeline**, **Cleanup Review**, **Reconcile** (optional post-load hygiene), **Data out** (schema + recipe Cypher + CSV exports via `data_out.py`), **Pipeline Efficiency Tracking**, **Dashboard** (MET-01, momentum, payoff, power shift, primary-lead regression, X/N scenes), **Investigate**. **REL-01:** cached Neo4j loaders and charts degrade gracefully; `agent.py` uses lazy Neo4j init. **`lead_resolution.py`** + **`SCRIPTRAG_*`** for lead/cohort overrides.
+- **Dashboard (`app.py`):** **ScriptRAG** (wide layout). Tabs: **Pipeline** (incl. self-heal corrections), **Verify** (warnings + load), **Reconcile** (optional post-load hygiene), **Data out** (`data_out.py`), **Pipeline Efficiency Tracking**, **Dashboard**, **Investigate**. Neo4j reset keeps **:PipelineRun**. **REL-01:** cached loaders; lazy Neo4j in `agent.py`. **`lead_resolution.py`** + **`SCRIPTRAG_*`**.
 
 ## 2. Metrics (do not conflate)
 

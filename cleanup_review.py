@@ -1,4 +1,4 @@
-"""Plain-language summaries for Cleanup Review (corrections + warning locations)."""
+"""Plain-language summaries for Verify tab (warnings) and pipeline correction copy."""
 
 from __future__ import annotations
 
@@ -12,6 +12,37 @@ _DUPLICATE_DETAIL_RE = re.compile(
     r"Duplicate relationship:\s*\(\s*([^,]+?)\s*,\s*([^,]+?)\s*,\s*([^)]+?)\s*\)\s*appears",
     re.IGNORECASE,
 )
+
+
+def warning_check_title(check: str) -> str:
+    """Human-readable title for a warning `check` field."""
+    key = str(check or "unknown").strip()
+    titles: dict[str, str] = {
+        "lexicon_compliance": "Lexicon compliance",
+        "duplicate_relationship": "Duplicate relationship",
+        "quote_fidelity": "Quote fidelity (auditor)",
+        "attribution": "Attribution (auditor)",
+        "completeness": "Possible missing edges (auditor)",
+        "audit_skipped": "LLM audit did not run",
+    }
+    return titles.get(key, key.replace("_", " ").title())
+
+
+def warning_verify_guidance(check: str) -> str:
+    """Short hint so the reviewer knows what Approve does."""
+    key = str(check or "").strip()
+    hints: dict[str, str] = {
+        "lexicon_compliance": "Approve removes a Character/Location node that is not in the lexicon (and its edges). Use if the extractor invented or misspelled an id.",
+        "duplicate_relationship": "Approve merges duplicate rows for the same (source, target, type) into one edge with combined quotes.",
+        "quote_fidelity": "Approve removes one relationship the auditor flagged as weakly supported by the quote. Decline if you think the edge is still valid.",
+        "attribution": "Approve removes one relationship where source/target may be swapped or wrong. Decline if attribution looks correct.",
+        "completeness": "Auditor thinks something is missing from the graph. Approve only records acknowledgment — you must edit the JSON yourself if you want new edges.",
+        "audit_skipped": "Technical failure during audit; no automatic graph change. Approve/decline is informational only.",
+    }
+    return hints.get(
+        key,
+        "Approve applies the documented edit for this warning type before Neo4j load, if any; otherwise it is logged only.",
+    )
 
 
 def cleanup_warning_widget_id(warning: dict[str, Any], index: int) -> str:

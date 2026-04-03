@@ -69,7 +69,10 @@ def run_extraction_pipeline(
     audit = list(state.get("audit_trail") or [])
     warnings = list(state.get("warnings") or [])
     gj = state.get("current_json")
-    telem = {"total_tokens": state.get("total_tokens", 0), "total_cost": state.get("total_cost", 0.0)}
+    telem = {
+        "total_tokens": int(state.get("total_tokens", 0) or 0),
+        "total_cost": float(state.get("total_cost", 0.0) or 0.0),
+    }
 
     if not gj:
         return None, audit, "empty current_json after pipeline", telem, warnings

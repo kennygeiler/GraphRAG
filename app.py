@@ -22,7 +22,9 @@ from cleanup_review import (
     cleanup_warning_widget_id,
     plain_english_fix_reason,
     summarize_graph_delta,
+    warning_check_title,
     warning_json_location,
+    warning_verify_guidance,
 )
 from ingest import build_system_prompt, extract_scenes
 from lead_resolution import resolve_primary_character_id, top_characters_k
@@ -36,7 +38,7 @@ from metrics import (
     get_structural_load_snapshot,
     get_top_characters_by_interaction_count,
 )
-from neo4j_loader import load_entries
+from neo4j_loader import load_entries, wipe_screenplay_graph_keep_pipeline_runs
 from parser import parse_fdx_to_raw_scenes, write_raw_scenes_json
 from pipeline_runs import list_pipeline_runs, save_pipeline_run
 from reconcile import (
@@ -79,7 +81,7 @@ def _env_truthy(name: str) -> bool:
 
 
 _PIPELINE_ENABLED = not _env_truthy("DISABLE_PIPELINE")
-# CEO / technical-demo tab order: Cleanup → Data out → Reconcile → … (see README / .env.example).
+# CEO / technical-demo tab order: Verify → Data out → Reconcile → … (see README / .env.example).
 _SCRIPTRAG_DEMO_LAYOUT = _env_truthy("SCRIPTRAG_DEMO_LAYOUT")
 
 
@@ -139,11 +141,11 @@ def _act_bounds_six(b: dict[str, Any]) -> tuple[int, int, int, int, int, int]:
     return (int(a1l), int(a1h), int(a2l), int(a2h), int(a3l), int(a3h))
 
 
-def _nuke_neo4j_all_nodes() -> None:
+def _wipe_dashboard_neo4j_keep_pipeline_runs() -> None:
+    """Clear screenplay graph only; **:PipelineRun** efficiency rows stay."""
     drv = get_driver()
     try:
-        with drv.session() as session:
-            session.run("MATCH (n) DETACH DELETE n")
+        wipe_screenplay_graph_keep_pipeline_runs(drv)
     finally:
         drv.close()
 
@@ -153,6 +155,64 @@ def _delete_pipeline_json_files() -> None:
         p = _PROJECT_ROOT / name
         if p.is_file():
             p.unlink()
+
+
+def _render_pipeline_corrections(corrections: list[dict[str, Any]]) -> None:
+    """Show fixer/audit repair trail where extraction happened (Pipeline tab)."""
+    st.subheader("Self-healing corrections")
+    st.caption(
+        "During **Stage 3**, some scenes needed a **rewrite** after rules or auditors reported errors. "
+        "This is the same graph the pipeline kept — nothing to approve here. Use **Verify** for **warnings** only."
+    )
+    for corr in corrections:
+        if not isinstance(corr, dict):
+            continue
+        sn = corr.get("scene_number", "?")
+        heading = corr.get("heading") or "untitled"
+        audit_entries = corr.get("audit_entries")
+        if not isinstance(audit_entries, list):
+            continue
+        with st.expander(f"Scene {sn} — {heading}", expanded=len(corrections) <= 3):
+            for entry in audit_entries:
+                node = entry.get("node", "?")
+                detail = entry.get("detail", "")
+
+                if node in ("fixer", "audit_fixer"):
+                    label = "Audit fixer" if node == "audit_fixer" else "Rules / schema fixer"
+                    reason = str(entry.get("reason") or "")
+                    st.markdown(f"**{label}** · attempt {entry.get('attempt', '?')}")
+                    st.markdown("**Why it failed validation**")
+                    st.write(plain_english_fix_reason(reason))
+                    if reason and len(reason) < 600:
+                        with st.expander("Raw validator message"):
+                            st.code(reason, language="text")
+                    before_g = entry.get("before") or {}
+                    after_g = entry.get("after") or {}
+                    if isinstance(before_g, dict) and isinstance(after_g, dict):
+                        bsum, asum = summarize_graph_delta(before_g, after_g)
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.markdown("**Before — extractor output**")
+                            st.markdown(bsum)
+                        with c2:
+                            st.markdown("**After — self-healed graph**")
+                            st.markdown(asum)
+                elif node == "audit" and entry.get("findings"):
+                    st.markdown(
+                        f"**Auditor pass** — {entry.get('error_count', 0)} error(s), "
+                        f"{entry.get('warning_count', 0)} warning(s) recorded"
+                    )
+                    for f in entry["findings"]:
+                        icon = "Error" if f.get("severity") == "error" else "Warning"
+                        st.markdown(f"*{icon}* · **{f.get('check', '?')}** — {f.get('detail', '')}")
+                        if f.get("suggestion"):
+                            st.caption(f"Suggestion: {f['suggestion']}")
+                elif entry.get("error"):
+                    st.markdown(f"**{node}** — {detail}")
+                    st.code(entry["error"], language="text")
+                else:
+                    st.markdown(f"**{node}** — {detail}")
+                st.divider()
 
 
 # ---------------------------------------------------------------------------
@@ -702,7 +762,7 @@ _structural_load = _cached_structural_load(_DASH_STAMP)
 st.title("ScriptRAG")
 st.caption(
     "Upload a screenplay, extract a knowledge graph with a self-healing AI pipeline, "
-    "review **Cleanup Review** (fixes + warnings), then explore the data."
+    "review corrections in **Pipeline**, **Verify** warnings, then explore the data."
 )
 
 if _flash := st.session_state.pop("_flash", None):
@@ -713,7 +773,7 @@ with st.sidebar:
     st.header("Controls")
     if _SCRIPTRAG_DEMO_LAYOUT:
         st.caption(
-            "**Demo layout** (`SCRIPTRAG_DEMO_LAYOUT=1`): tabs emphasize **Cleanup → Data out** before reconcile "
+            "**Demo layout** (`SCRIPTRAG_DEMO_LAYOUT=1`): tabs emphasize **Verify → Data out** before reconcile "
             "and analytics — for pipeline storytelling."
         )
     with st.expander("Primary lead", expanded=False):
@@ -735,18 +795,23 @@ with st.sidebar:
         st.session_state["_flash"] = "Cache cleared — re-querying Neo4j."
         st.rerun()
 
-    with st.expander("Reset database", expanded=False):
-        st.caption("Wipe **all** Neo4j nodes and delete pipeline JSON artifacts from disk.")
-        if st.button("Nuke database & cache", key="sidebar_nuke"):
+    with st.expander("Reset dashboard data", expanded=False):
+        st.caption(
+            "Clears the **screenplay graph** in Neo4j (what **Dashboard** / **Investigate** read) and removes "
+            "pipeline JSON on disk. **:PipelineRun** rows are kept — **Pipeline Efficiency Tracking** history stays."
+        )
+        if st.button("Clear graph & pipeline files", key="sidebar_nuke"):
             try:
-                _nuke_neo4j_all_nodes()
+                _wipe_dashboard_neo4j_keep_pipeline_runs()
                 _delete_pipeline_json_files()
             except Exception as exc:
-                st.error(f"Wipe failed: {exc}")
+                st.error(f"Reset failed: {exc}")
             else:
                 st.session_state.pop("pipeline_results", None)
                 st.cache_data.clear()
-                st.session_state["_flash"] = "Slate wiped — Neo4j and pipeline JSON cleared."
+                st.session_state["_flash"] = (
+                    "Neo4j screenplay graph cleared (PipelineRun history kept); pipeline JSON removed."
+                )
                 st.rerun()
 
 # --------------- tabs -----------------------------------------------
@@ -755,7 +820,7 @@ if _PIPELINE_ENABLED:
     _tab_labels.append("Pipeline")
 if _SCRIPTRAG_DEMO_LAYOUT:
     _tab_labels += [
-        "Cleanup Review",
+        "Verify",
         "Data out",
         "Reconcile",
         "Pipeline Efficiency Tracking",
@@ -764,7 +829,7 @@ if _SCRIPTRAG_DEMO_LAYOUT:
     ]
 else:
     _tab_labels += [
-        "Cleanup Review",
+        "Verify",
         "Reconcile",
         "Data out",
         "Pipeline Efficiency Tracking",
@@ -1013,16 +1078,16 @@ For an 86-scene script: **~$0.85 fast** or **~$2.50 full audit**.
                         "total_scenes": total,
                         "extracted": len(all_entries),
                         "failed": failed_count,
-                        "tokens": cum_tokens,
-                        "cost": cum_cost,
+                        "tokens": int(cum_tokens or 0),
+                        "cost": float(cum_cost or 0.0),
                     }
                     _saved = _persist_pipeline_run(
                         scenes_extracted=len(all_entries),
                         total_scenes=total,
                         corrections_count=len(corrections),
                         warnings_count=len(all_warnings),
-                        telemetry_tokens=cum_tokens,
-                        telemetry_cost_usd=cum_cost,
+                        telemetry_tokens=int(cum_tokens or 0),
+                        telemetry_cost_usd=float(cum_cost or 0.0),
                         failed_scenes=failed_count,
                         llm_auditors_enabled=bool(_enable_audit),
                     )
@@ -1042,24 +1107,32 @@ For an 86-scene script: **~$0.85 fast** or **~$2.50 full audit**.
                 with c3:
                     st.metric("Warnings", len(pr.get("warnings", [])))
                 with c4:
-                    st.metric("Telemetry tokens", f"{pr['tokens']:,}")
+                    st.metric(
+                        "Telemetry tokens",
+                        f"{int(pr.get('tokens', 0) or 0):,}",
+                    )
                 with c5:
-                    st.metric("Telemetry cost", f"${pr['cost']:.4f}")
+                    st.metric(
+                        "Telemetry cost",
+                        f"${float(pr.get('cost', 0.0) or 0.0):.4f}",
+                    )
+
+                if pr.get("corrections"):
+                    _render_pipeline_corrections(pr["corrections"])
 
                 if pr["corrections"] or pr.get("warnings"):
                     parts = []
                     if pr["corrections"]:
-                        parts.append(f"**{len(pr['corrections'])}** correction(s)")
+                        parts.append(f"**{len(pr['corrections'])}** scene(s) with self-healing corrections (above)")
                     if pr.get("warnings"):
-                        parts.append(f"**{len(pr['warnings'])}** warning(s)")
+                        parts.append(f"**{len(pr['warnings'])}** warning(s) to review")
                     st.info(
-                        f"Cleanup Review: {' and '.join(parts)}. "
-                        "Open the **Cleanup Review** tab, then approve to load into Neo4j."
+                        f"{' · '.join(parts)}. Open **Verify** to decide each warning, then **Approve & Load** into Neo4j."
                     )
                 elif pr["extracted"] > 0:
                     st.success(
                         "All scenes passed validation on the first try. "
-                        "Head to **Cleanup Review** to approve and load into Neo4j."
+                        "Open **Verify** to approve and load into Neo4j."
                     )
 
         elif not _TARGET_FDX.is_file():
@@ -1067,19 +1140,19 @@ For an 86-scene script: **~$0.85 fast** or **~$2.50 full audit**.
 
 
 # ===================================================================
-# TAB: Cleanup Review
+# TAB: Verify (warnings + load)
 # ===================================================================
 
 with tab_editor:
-    st.header("Cleanup Review")
+    st.header("Verify")
     st.caption(
-        "**Corrections:** what broke, in plain English, plus a compact before/after summary (not raw JSON). "
-        "**Warnings:** where in the extracted graph the flag applies — approve (acknowledged) or decline (false positive)."
+        "Review **warnings** from rules and LLM auditors. **Approve** applies the listed edit before Neo4j load "
+        "(where supported); **Decline** skips it. Self-healing **corrections** are summarized in the **Pipeline** tab."
     )
     st.info(
-        "**Human-in-the-loop gate.** Per-scene **self-healing** (validate → fix → optional LLM audit) already ran in "
-        "**Pipeline**. Here you decide which warnings are real, then **Approve & load to Neo4j** commits the graph — "
-        "the manipulable dataset downstream tools consume. Next: optional **Reconcile**, then **Data out** for exports."
+        "**Human-in-the-loop gate.** Deterministic checks and optional auditors already ran in **Pipeline**. "
+        "Here you judge each **warning** — then **Approve & load to Neo4j** commits the graph. "
+        "Next: optional **Reconcile**, then **Data out**."
     )
 
     pr = st.session_state.get("pipeline_results")
@@ -1090,102 +1163,65 @@ with tab_editor:
             st.session_state["cleanup_warning_decisions"] = {}
         wd = st.session_state["cleanup_warning_decisions"]
 
-        n_corrections = len(pr["corrections"])
+        n_corrections = len(pr.get("corrections") or [])
         n_warnings = len(pr.get("warnings", []))
         st.markdown(
             f"**{pr['extracted']}** scenes extracted — "
-            f"**{n_corrections}** scene(s) with auto-fixes, "
-            f"**{n_warnings}** warning(s), "
+            f"**{n_corrections}** with self-healing corrections (see **Pipeline**) · "
+            f"**{n_warnings}** warning(s) below · "
             f"**{pr['failed']}** failed."
         )
 
-        if pr["corrections"]:
-            st.subheader(f"Corrections ({n_corrections})")
-            for corr in pr["corrections"]:
-                if not isinstance(corr, dict):
-                    continue
-                sn = corr.get("scene_number", "?")
-                heading = corr.get("heading") or "untitled"
-                audit_entries = corr.get("audit_entries")
-                if not isinstance(audit_entries, list):
-                    continue
-                with st.expander(f"Scene {sn} — {heading}", expanded=False):
-                    for entry in audit_entries:
-                        node = entry.get("node", "?")
-                        detail = entry.get("detail", "")
-
-                        if node in ("fixer", "audit_fixer"):
-                            label = "Audit fixer" if node == "audit_fixer" else "Schema / rules fixer"
-                            reason = str(entry.get("reason") or "")
-                            st.markdown(f"#### {label} (attempt {entry.get('attempt', '?')})")
-                            st.markdown("**What was wrong**")
-                            st.write(plain_english_fix_reason(reason))
-                            if reason and len(reason) < 600:
-                                with st.expander("Technical detail from validator"):
-                                    st.code(reason, language="text")
-                            before_g = entry.get("before") or {}
-                            after_g = entry.get("after") or {}
-                            if isinstance(before_g, dict) and isinstance(after_g, dict):
-                                bsum, asum = summarize_graph_delta(before_g, after_g)
-                                c1, c2 = st.columns(2)
-                                with c1:
-                                    st.markdown("**Before** (summary)")
-                                    st.markdown(bsum)
-                                with c2:
-                                    st.markdown("**After** (summary)")
-                                    st.markdown(asum)
-                        elif node == "audit" and entry.get("findings"):
-                            st.markdown(
-                                f"**Audit pass** — {entry.get('error_count', 0)} error(s), "
-                                f"{entry.get('warning_count', 0)} warning(s) in findings"
-                            )
-                            for f in entry["findings"]:
-                                icon = "🔴" if f.get("severity") == "error" else "🟡"
-                                st.markdown(f"{icon} **{f.get('check', '?')}** — {f.get('detail', '')}")
-                                if f.get("suggestion"):
-                                    st.caption(f"Suggestion: {f['suggestion']}")
-                        elif entry.get("error"):
-                            st.markdown(f"**{node}** — {detail}")
-                            st.code(entry["error"], language="text")
-                        else:
-                            st.markdown(f"**{node}** — {detail}")
-                        st.divider()
-        else:
-            st.success("No fixer corrections — every scene passed deterministic checks without a rewrite.")
-
-        warnings_list = pr.get("warnings", [])
+        warnings_list = list(pr.get("warnings", []))
         entries = pr.get("entries", [])
         if warnings_list:
-            st.subheader(f"Warnings ({n_warnings})")
+            st.subheader(f"Warnings to verify ({n_warnings})")
             st.caption(
-                "**Approve** queues that cleanup for the next **Approve & Load** (edits are applied in memory "
-                "immediately before Neo4j). **Decline** skips it. "
-                "Completeness warnings have no automatic graph edit."
+                "Each card explains **what the check means** and what **Approve** does. "
+                "Use **Decline** when the graph is correct as-is."
             )
             for wi, w in enumerate(warnings_list):
                 if not isinstance(w, dict):
                     continue
                 wid = cleanup_warning_widget_id(w, wi)
                 loc = warning_json_location(w, entries)
-                check = w.get("check", "unknown")
-                detail = w.get("detail", "")
-                st.markdown(f"**{check}** — {detail}")
-                st.caption(f"📍 {loc}")
-                current = wd.get(wid, "unset")
-                r1, r2, r3 = st.columns([1, 1, 4])
-                with r1:
-                    if st.button("Approve", key=f"cw_ok_{wid}", type="primary" if current == "approved" else "secondary"):
-                        wd[wid] = "approved"
-                        st.rerun()
-                with r2:
-                    if st.button("Decline", key=f"cw_no_{wid}", type="primary" if current == "declined" else "secondary"):
-                        wd[wid] = "declined"
-                        st.rerun()
-                if current == "approved":
-                    st.success("Marked **approved**.")
-                elif current == "declined":
-                    st.info("Marked **declined** (false positive).")
-                st.divider()
+                check_raw = str(w.get("check", "unknown"))
+                title = warning_check_title(check_raw)
+                detail = str(w.get("detail", "") or "")
+                sev = str(w.get("severity", "") or "").strip()
+                with st.container(border=True):
+                    st.markdown(f"**{title}** (`{check_raw}`)")
+                    if sev:
+                        st.caption(f"Severity from pipeline: **{sev}**")
+                    st.markdown(warning_verify_guidance(check_raw))
+                    st.markdown("**What the pipeline reported**")
+                    st.write(detail if detail else "_(no detail text)_")
+                    st.caption("Location in extracted JSON")
+                    st.code(loc, language="text")
+                    current = wd.get(wid, "unset")
+                    r1, r2 = st.columns(2)
+                    with r1:
+                        if st.button(
+                            "Approve — apply fix",
+                            key=f"cw_ok_{wid}",
+                            type="primary" if current == "approved" else "secondary",
+                        ):
+                            wd[wid] = "approved"
+                            st.rerun()
+                    with r2:
+                        if st.button(
+                            "Decline — keep graph",
+                            key=f"cw_no_{wid}",
+                            type="primary" if current == "declined" else "secondary",
+                        ):
+                            wd[wid] = "declined"
+                            st.rerun()
+                    if current == "approved":
+                        st.success("**Approved** — this edit will run on **Approve & Load**.")
+                    elif current == "declined":
+                        st.info("**Declined** — treated as false positive; no edit from this warning.")
+        else:
+            st.success("No warnings — nothing to verify. You can load below.")
 
         st.divider()
 
@@ -1198,7 +1234,7 @@ with tab_editor:
                 type="primary",
                 key="editor_approve_load",
             ):
-                with st.spinner("Applying approved cleanups & loading into Neo4j…"):
+                with st.spinner("Applying approved warning edits & loading into Neo4j…"):
                     try:
                         to_load, edit_log = apply_approved_warning_edits(
                             entries_to_load,
@@ -1206,7 +1242,7 @@ with tab_editor:
                             wd,
                         )
                         if edit_log:
-                            with st.expander("Cleanup edits applied before load", expanded=True):
+                            with st.expander("Verify edits applied before load", expanded=True):
                                 for line in edit_log:
                                     st.markdown(f"- {line}")
                         loaded = load_entries(to_load)
@@ -1384,7 +1420,7 @@ with tab_reconcile:
 with tab_data_out:
     st.header("Data out")
     st.caption(
-        "After **Cleanup Review** (HITL) and **Approve & Load**, the screenplay lives as **structured graph data** "
+        "After **Verify** (HITL) and **Approve & Load**, the screenplay lives as **structured graph data** "
         "in Neo4j. Use this tab to **inspect the schema**, run **recipe Cypher** (read-only), and **download CSV** "
         "for spreadsheets, warehouses, or demos."
     )
@@ -1395,7 +1431,7 @@ with tab_data_out:
     _rc = _cached_rel_type_counts(_stamp_out)
     if not _lc and not _rc:
         st.info(
-            "No graph statistics yet — connect Neo4j, load from **Cleanup Review**, or check credentials. "
+            "No graph statistics yet — connect Neo4j, load from **Verify**, or check credentials. "
             "Counts refresh with the same cache as the Dashboard (**Reload metrics** in the sidebar)."
         )
     else:
@@ -1549,7 +1585,7 @@ with tab_dashboard:
             )
     else:
         st.info(
-            "No scene data in Neo4j yet. Run the **Pipeline**, review **Cleanup Review**, "
+            "No scene data in Neo4j yet. Run the **Pipeline**, use **Verify**, "
             "then **Approve & Load** to populate the dashboard."
         )
 
