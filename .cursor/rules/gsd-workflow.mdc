@@ -1,0 +1,220 @@
+<!-- gsd-project-start source:PROJECT.md -->
+## Project
+
+**ScriptRAG (GraphRAG)**
+
+**ScriptRAG** is a GraphRAG system for screenplays: Final Draft (`.fdx`) is parsed into JSON, a self-healing LLM pipeline extracts a validated scene graph (Pydantic + instructor) with **verbatim `source_quote`** on narrative edges, and **Neo4j** stores `Character`, `Location`, `Prop`, and `Event` nodes with structural and narrative relationships. A **Streamlit** app runs the pipeline, cleanup review, efficiency tracking, structural metrics dashboards, and natural-language graph investigation.
+
+**Audience:** Writers, producers, and developers analyzing narrative “physics” (agency, friction, props, conflict structure)—not vibes without evidence.
+
+**Core Value:** End-to-end, **evidence-backed** structural analysis of a screenplay in a queryable graph—with a working pipeline from upload → validated extraction → Neo4j → metrics and investigation.
+
+### Constraints
+
+- **Tech:** Python 3.12, Neo4j, Streamlit, Plotly, parameterized Cypher only for user-facing query paths.
+- **Evidence:** Narrative edges must retain verbatim `source_quote` from the script.
+- **Documentation:** On major milestones, update `strategy.md` first, then mirrors—per repo rules.
+<!-- gsd-project-end -->
+
+<!-- gsd-stack-start source:codebase/STACK.md -->
+## Technology Stack
+
+## Languages
+- Python 3.12 — application, ETL, dashboard, CLI-style scripts (`requires-python` in `pyproject.toml`; base image `python:3.12-slim-bookworm` in `Dockerfile`)
+- Not applicable (no TypeScript/JavaScript application source; Streamlit serves the UI from Python)
+## Runtime
+- CPython 3.12 (local, Docker)
+- uv (Astral) — install and lockfile management per `README.md` / `AGENTS.md`
+- Lockfile: present at `uv.lock` (use `uv sync --frozen` in `Dockerfile`)
+## Frameworks
+- Streamlit 1.55.0 — primary web UI (`app.py`)
+- LangGraph 1.1.3 — extract → validate → fix → audit pipeline (`etl_core/graph_engine.py`, `extraction_graph.py`, `ingest.py`)
+- Pydantic 2.12.5 — schemas and validation (`schema.py`, ETL state)
+- Plotly 6.6.0 — charts in Streamlit (`app.py`; `pyproject.toml` allows `>=5.24.0`, lock resolves to 6.6.0)
+- LangChain Core 1.2.23 (transitive) — prompts and chains (`agent.py`)
+- langchain-anthropic 1.4.0 — `ChatAnthropic` for Investigate tab QA (`agent.py`)
+- langchain-neo4j 0.9.0 — `Neo4jGraph`, `GraphCypherQAChain` (`agent.py`)
+- Not detected — no `pytest` / `unittest` config or `*_test.py` / `test_*.py` files in repo root tree
+- Docker — multi-stage image with uv (`Dockerfile`)
+- docker-compose — local stack (`docker-compose.yml`, `docker-compose.stack.yml`)
+## Key Dependencies
+- anthropic 0.86.0 — Messages API for extraction and lexicon (`extraction_llm.py`, `lexicon.py`)
+- instructor 1.14.5 — structured outputs on Anthropic client (`extraction_llm.py`, `lexicon.py`, `domains/screenplay/auditors.py`)
+- neo4j 6.1.0 — Bolt driver for graph load and metrics (`neo4j_loader.py`, `metrics.py`, `pipeline_runs.py`, `agent.py`, `reconcile.py`, `qa_entities.py`, `debug_export.py`, `producer_notes.py`)
+- fuzzywuzzy 0.18.0 — string similarity in reconciliation (`reconcile.py`)
+- python-dotenv 1.2.2 — load `.env` (`etl_core/config.py`, `neo4j_loader.py`, `agent.py`, several scripts)
+- httpx, jiter, anyio — used by `anthropic` SDK
+- langsmith — optional tracing when LangChain/LangGraph emit traces (env-driven via `etl_core/config.py`)
+## Configuration
+- Load via `python-dotenv` from project `.env` (see names only in `.env.example`; do not commit secrets)
+- Key variables: `ANTHROPIC_API_KEY`, `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, optional LangSmith (`LANGCHAIN_*`), optional `PERSISTENT_DATA_DIR`, optional `DISABLE_PIPELINE` (documented in `.env.example`; pipeline gating in `app.py`)
+- `pyproject.toml` — project metadata and dependency ranges
+- `uv.lock` — resolved versions for reproducible installs
+- `requirements.txt` — pointer to uv workflow (not a flat pin list)
+- `render.yaml` — Render Blueprint (web service env var keys, disk mount)
+- `Dockerfile` — `uv sync --frozen --no-install-project --no-dev`
+## Platform Requirements
+- Python ≥3.12, uv, optional local or remote Neo4j; run app with `uv run streamlit run app.py` (per `README.md` / `AGENTS.md`)
+- Docker image exposes 8501; `PORT` respected for PaaS (`Dockerfile` / README)
+- Typical target: Render (blueprint in `render.yaml`) with Neo4j URI pointing to Aura or co-located instance
+<!-- gsd-stack-end -->
+
+<!-- gsd-conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+## Naming Patterns
+- Use `snake_case.py` at repo root for top-level modules (`app.py`, `metrics.py`, `neo4j_loader.py`, `ingest.py`).
+- Domain-specific code lives under `domains/<domain>/` with the same pattern (`adapter.py`, `rules.py`, `auditors.py`, `schemas.py`).
+- Package internals: `etl_core/` uses short descriptive module names (`graph_engine.py`, `telemetry.py`, `errors.py`).
+- Public API: `snake_case` (`get_driver`, `load_entries`, `format_scene_user_message`).
+- Internal helpers: leading underscore (`_require_env`, `_merge_event`, `_build_validator`, `_ensure_clients`).
+- Callable factories inside engines use nested names like `_build_extractor` returning `_extract`.
+- `snake_case` for locals and parameters (`own`, `drv`, `session`, `gjson`).
+- Module-level constants: `UPPER_SNAKE` for tunables and exported sets (`MAX_FIX_ATTEMPTS`, `ENTITY_LABELS`, `ROLLING_SCENES`).
+- “Private” module constants may use leading underscore (`_ROOT`, `_MAX_TOKENS`, `_SOURCE_QUOTE_MERGE_SEP`).
+- Pydantic models and exception classes: `PascalCase` (`SceneGraph`, `Relationship`, `MaxRetriesError`).
+- `TypedDict` for structured dicts: `PascalCase` (`ETLState`, `SceneDict`, `RawSceneDict`).
+- Type aliases and literals: `PascalCase` or descriptive caps (`SnakeCaseId`, `EntityLabel`, `RelationshipType`).
+- Character, location, and prop IDs in extracted data are enforced as lexicon-aligned `snake_case` where validated (`schema.py` uses `AfterValidator` for snake_case IDs).
+## Code Style
+- Not detected: no `ruff.toml`, `.ruff.toml`, `pyproject.toml` `[tool.ruff]` / `[tool.black]`, `.pre-commit-config.yaml`, or `mypy.ini` in the repository.
+- Match surrounding files when editing; keep line length and wrapping consistent with neighbors (typically Black-like double quotes for strings in new code if ambiguous).
+- Not detected: no configured linter in project manifests.
+- `requires-python = ">=3.12"` in `pyproject.toml`; use 3.12+ syntax (`str | None`, `list[dict[str, Any]]`).
+## Import Organization
+- Not used; imports are flat package-relative from project root (no `src/` layout).
+- `metrics.py` defines `__all__` for the public query surface; other modules rely on implicit exports.
+## Error Handling
+- **Missing configuration (CLI / scripts):** `_require_env` in `metrics.py` and `neo4j_loader.py` prints a clear message and calls `sys.exit(1)`. `extraction_llm.py` does the same for `ANTHROPIC_API_KEY`.
+- **Pydantic validation:** Catch `ValidationError` in pipelines (`etl_core/graph_engine.py`, `ingest.py`) to drive retry/fix loops and logging to files (e.g. `failed_scenes.log`), not always to re-raise immediately.
+- **Invalid invariants in Python code:** `ValueError` for bad labels or inputs (`neo4j_loader.py` `_merge_entity` when label not in `ENTITY_LABELS`).
+- **ETL exhaustion:** `MaxRetriesError` in `etl_core/errors.py` subclasses `RuntimeError` and carries `retry_count` / `last_error`.
+- **LLM transport:** `APIStatusError` and `InstructorRetryException` are re-raised from `call_llm_with_usage` in `extraction_llm.py`; primary→fallback wrappers catch broad `Exception` (and `APIStatusError`) to retry on the fallback model—when adding code, avoid swallowing errors silently outside that pattern.
+- **Streamlit / UI:** Prefer `st.error` / user-visible messages in `app.py` for recoverable failures; use the same Neo4j env pattern as `metrics.get_driver` when opening drivers.
+- Use parameterized queries only (`$id`, `$number`, etc.); do not interpolate user or file-derived strings into query text except for static labels already validated in code (see `neo4j_loader.py` pattern for `MERGE (n:Label …)` where `Label` comes from a closed set).
+## Logging
+- `print(..., flush=True)` for operator-facing errors and sanity checks (`schema.py` `main()`, env missing messages).
+- **Audit / persistence:** JSON lines append to files (`ingest.py` `_append_audit_entries`, `_append_failed_log`); LangGraph state holds `audit_trail` lists in `ETLState` (`etl_core/state.py`).
+## Comments
+- Module docstrings explain responsibility and boundaries (`etl_core/graph_engine.py`, `extraction_llm.py`, `cleanup_review.py`).
+- Section banners (`# ---------------------------------------------------------------------------`) separate phases in `graph_engine.py`.
+- `Field(description=...)` on Pydantic models documents LLM-facing contracts (`schema.py`, `domains/screenplay/schemas.py`).
+- Public functions that cross Neo4j or analytics layers often have one-line docstrings (`metrics.py`).
+- Prefer type hints on public functions and dataclass fields (`SceneResult` in `ingest.py`).
+## Function Design
+- Use keyword-only markers for optional driver injection: `*, driver: Driver | None = None` in `metrics.py` to avoid accidental positional args.
+- LLM wrappers return `tuple[BaseModel, dict[str, Any]]` with usage dicts keyed consistently for `etl_core/telemetry.py` (`accumulate_usage`).
+- Metrics functions return plain JSON-serializable structures (`list[dict]`, `dict[str, int]`, `float | None`).
+## Module Design
+- `etl_core/` stays domain-agnostic; screenplay specifics live in `domains/screenplay/` and are wired via `DomainBundle` (`domains/screenplay/adapter.py`).
+- Root `schema.py` holds shared graph shapes; `domains/screenplay/schemas.py` extends or mirrors for the domain where needed—check both when changing extraction shape.
+<!-- gsd-conventions-end -->
+
+<!-- gsd-architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+## Pattern Overview
+- **Pipeline-first data path:** Final Draft (`.fdx`) → JSON artifacts → LLM extraction → validated scene graphs → Neo4j → read-side analytics and UI.
+- **Separation of engine and domain:** `etl_core/` implements a generic extract → validate → fix → (optional audit → audit-fix) graph; screenplay specifics are wired through `DomainBundle` from `domains/screenplay/adapter.py`.
+- **Single graph contract:** Pydantic models in `schema.py` define `SceneGraph`, nodes, and `Relationship` (including mandatory `source_quote`). `domains/screenplay/schemas.py` re-exports those models for domain-local imports.
+- **Dual LLM stacks:** Anthropic + `instructor` for structured extraction/fix (`extraction_llm.py`); LangChain + `langchain_neo4j` for natural-language graph QA (`agent.py`).
+## Layers
+- Purpose: User-facing tabs for pipeline run, cleanup review, efficiency history, dashboard charts, and “Investigate” chat.
+- Location: `app.py`
+- Contains: Tab layout, `st.session_state`, Plotly figures, calls into ingest/loader/metrics/agent/cleanup helpers.
+- Depends on: `ingest`, `parser`, `lexicon`, `neo4j_loader`, `metrics`, `agent`, `cleanup_review`, `pipeline_runs`, `pipeline_state`.
+- Used by: Invoked via `uv run streamlit run app.py` (process entry).
+- Purpose: Long-running or batch workflows (ingest all scenes, load graph, build lexicon, metrics CLI, reconciliation, QA dumps).
+- Location: `ingest.py`, `neo4j_loader.py`, `lexicon.py`, `parser.py`, `metrics.py`, `reconcile.py`, `qa_entities.py`, `debug_export.py`, `producer_notes.py`
+- Contains: `argparse` `if __name__ == "__main__"` blocks, file I/O to project-root JSON artifacts, progress hooks into `pipeline_state.py`.
+- Depends on: Lower layers (ETL, schema, Neo4j driver, optional LLM).
+- Used by: Operators and the Streamlit Pipeline tab (in-process calls, not subprocess).
+- Purpose: LangGraph `StateGraph` over `ETLState`: extract, validate, conditional fix loop, optional LLM audit and audit-fix loop; telemetry aggregation.
+- Location: `etl_core/graph_engine.py`, `etl_core/state.py`, `etl_core/telemetry.py`, `etl_core/errors.py`, `etl_core/config.py`
+- Contains: `DomainBundle` dataclass, `build_graph`, `run_pipeline`, `MaxRetriesError`.
+- Depends on: LangGraph, Pydantic only at boundaries (injected model type).
+- Used by: `extraction_graph.py` (facade), never imported by `domains/*` from `etl_core` in reverse for screenplay rules (adapter pulls from both sides).
+- Purpose: Bind `SceneGraph` validation, business rules, and Anthropic call sites into a `DomainBundle`.
+- Location: `domains/screenplay/adapter.py`, `domains/screenplay/rules.py`, `domains/screenplay/auditors.py`, `domains/screenplay/schemas.py`, `domains/screenplay/__init__.py`
+- Contains: `get_bundle()`, lexicon-aware `validate_business_logic`, combined LLM auditors.
+- Depends on: `schema.py` (canonical models), `extraction_llm.py`.
+- Used by: `extraction_graph.py`.
+- Purpose: Stable `run_extraction_pipeline` API for `ingest.py`; compile/cache LangGraph per lexicon id set; Anthropic client wiring and instructor calls.
+- Location: `extraction_graph.py`, `extraction_llm.py`
+- Depends on: `domains/screenplay/adapter.py`, `etl_core/graph_engine.py`, `schema.py`.
+- Used by: `ingest.py`.
+- Purpose: Authoritative JSON shape for one scene’s graph; relationship types and snake_case id rules.
+- Location: `schema.py`
+- Contains: `SceneGraph`, `Relationship`, discriminated `GraphNode`, etc.
+- Depends on: Pydantic only.
+- Used by: Ingest, loader, domain rules, extraction.
+- Purpose: Write validated JSON into Neo4j (merge events, entities, `IN_SCENE`, narrative rels with quote merging); parameterized Cypher for metrics and pipeline run history.
+- Location: `neo4j_loader.py`, `metrics.py`, `pipeline_runs.py`
+- Contains: Transactional load, wipe that preserves `:PipelineRun`, dashboard query functions, `get_driver()`.
+- Depends on: `neo4j` driver, env vars `NEO4J_*`.
+- Used by: `app.py`, CLI loaders, `agent.py` (via LangChain graph).
+- Purpose: Cleanup Review copy, warning keys, graph deltas without bloating `app.py`.
+- Location: `cleanup_review.py`
+- Depends on: stdlib + typing; JSON-shaped dicts from session state.
+- Used by: `app.py`.
+- Purpose: Durable ingest progress and last successful Neo4j load metadata for CLI and Streamlit.
+- Location: `pipeline_state.py`, artifact `pipeline_state.json` at repo root.
+- Depends on: `pathlib`, `json`.
+- Used by: `ingest.py`, `neo4j_loader.py`, `app.py` (cache stamps).
+## Data Flow
+- **Streamlit:** `st.session_state` holds uploaded file state, extraction results, cleanup decisions, and chart inputs.
+- **Disk:** JSON artifacts at repo root (`raw_scenes.json`, `master_lexicon.json`, `validated_graph.json`, `pipeline_state.json`, optional `extraction_audit.jsonl`, `failed_scenes.log`).
+- **Neo4j:** System of record for loaded graph + `PipelineRun` telemetry nodes.
+## Key Abstractions
+- Purpose: Inject pydantic model type, deterministic business rules, and three LLM callables (extract, fix, optional audit) into the generic graph.
+- Examples: `etl_core/graph_engine.py` (`DomainBundle`), `domains/screenplay/adapter.py` (`get_bundle`).
+- Pattern: Dependency injection / ports-and-adapters for the ETL engine.
+- Purpose: TypedDict carried through LangGraph nodes (`raw_text`, `system_prompt`, `current_json`, retries, `audit_trail`, `warnings`, token/cost totals).
+- Pattern: Reducer-free state updates returned as partial dicts from each node.
+- Purpose: One scene’s nodes and relationships as validated JSON before load.
+- Pattern: Pydantic v2 models with discriminators and constrained relationship literals.
+- Purpose: Per-scene outcome for UI progress and logging (`ok`, `fixed`, `failed`, etc.) with optional `graph_entry`, warnings, telemetry.
+- Purpose: `_merge_event`, `_merge_entity`, `_merge_in_scene`, relationship deduplication and `source_quote` merging for selected types.
+- Pattern: One transaction flow with parameterized Cypher strings (no user-built query strings from UI in loader; metrics use fixed Cypher).
+## Entry Points
+- Location: `app.py`
+- Triggers: `streamlit run app.py`
+- Responsibilities: Full product UI, orchestrating parse/lexicon/extract/load paths, dashboard queries, sidebar destructive actions (scoped Neo4j nuke vs full delete documented in code).
+- Location: `ingest.py` (`if __name__ == "__main__"`)
+- Triggers: `uv run python ingest.py` with documented flags (e.g. `--fresh`).
+- Responsibilities: Batch extraction, audit logging, failure logs.
+- Location: `neo4j_loader.py` (`if __name__ == "__main__"`)
+- Triggers: `uv run python neo4j_loader.py` (arguments per module).
+- Responsibilities: Load `validated_graph.json` into Neo4j.
+- Locations: `parser.py`, `lexicon.py`, `metrics.py`, `reconcile.py`, `qa_entities.py`, `debug_export.py` — each exposes `if __name__ == "__main__"` for CLI use.
+- Responsibilities: Single-purpose tools aligned with `strategy.md` stage table.
+- Location: `agent.py` (`if __name__ == "__main__"`)
+- Triggers: Direct run for testing QA chain.
+## Error Handling
+- Pydantic `ValidationError` in extract/fix and post-pipeline `SceneGraph.model_validate` in `extraction_graph.py`.
+- Anthropic `APIStatusError` handling in `ingest.py` for API failures.
+- Optional LLM audit failures downgrade to warnings in `etl_core/graph_engine.py` (`audit` node exception path).
+## Cross-Cutting Concerns
+<!-- gsd-architecture-end -->
+
+<!-- gsd-workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd-debug` for investigation and bug fixing
+- `/gsd-execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- gsd-workflow-end -->
+
+
+
+<!-- gsd-profile-start -->
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
+> This section is managed by `generate-claude-profile` -- do not edit manually.
+<!-- gsd-profile-end -->
