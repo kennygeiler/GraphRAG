@@ -15,14 +15,14 @@
 
 **Why I built it:** This repo started as a **sandbox** to experiment with **structured data extraction** from creative text, **token and dollar behavior** across pipeline stages, and **efficiency tradeoffs** (prompt shape, model choice per stage, what to automate vs send to a human). The screenplay domain is the vehicle; the thread running through the work is **measurable pipelines**: know what ran, what it cost, and what changed when you ship a new extraction or audit strategy.
 
-**Pipeline Efficiency Tracking** is the operational side of that experiment. Each finished run writes a **`:PipelineRun`** in Neo4j with **total** and **per-stage** buckets (**extract / fix / audit**), plus a **Token Agent** label (**`v0`–`v3`**) that maps to **`telemetry_version`**—so a row from last month is comparable to one from today. [**`Telemetry.md`**](Telemetry.md) is the version changelog and A/B log (e.g. Ludwig micro-sample: Phase 1 vs Phase 2 audit routing). **Reserved `v4` / `v5`** in the UI describe the next roadmap waves before the code bumps the constant.
+**Pipeline Efficiency Tracking** is the operational side of that experiment. Each finished run writes a **`:PipelineRun`** in Neo4j with **total** and **per-stage** buckets (**extract / fix / audit**), plus a **Token Agent** that maps to **`telemetry_version`**—so a row from last month is comparable to one from today. [**`Telemetry.md`**](Telemetry.md) is the version changelog and A/B log (e.g. Ludwig micro-sample: Phase 1 vs Phase 2 audit routing).
 
-**At scale**, that discipline matters: many scripts or many re-runs make **“roughly cheaper”** useless without **attribution** (which stage moved, after which deploy). Persisting runs in the graph (and keeping them when you **clear** screenplay data) supports **budget planning**, **regression checks** after prompt or model changes, and **comparing** behavior across **versions** the same way you compare **accuracy**—with rows you can filter and export. The roadmap in **`strategy.md`** ties each Token Agent bump to a concrete phase (instrumentation → payload shrink → audit model routing → future conditional audit, caching, etc.).
+**At scale**, that discipline matters: many scripts or many re-runs make **“roughly cheaper”** useless without **attribution** (which stage moved, after which deploy). Persisting runs in the graph (and keeping them when you **clear** screenplay data) supports **budget planning**, **regression checks** after prompt or model changes, and **comparing** behavior across **versions** the same way you compare **accuracy**—with rows you can filter and export. The roadmap in **`strategy.md`** ties each Token Agent bump to a concrete phase.
 
 | | |
 |--|--|
 | **Live demo** | [scriptrag.onrender.com](https://scriptrag.onrender.com/) |
-| **Repo** | [github.com/kennygeiler/GraphRAG](https://github.com/kennygeiler/GraphRAG) |
+| **Repo** | [github.com/kennygeiler/GraphRAG](https://github.com/kennygeiler/ScriptRAG) |
 | **Deep dive** | [`strategy.md`](strategy.md) (architecture, metrics, roadmap) · [`AGENTS.md`](AGENTS.md) (conventions) · [`Telemetry.md`](Telemetry.md) (pipeline cost / Token Agent versions) |
 
 [![100% Agentic Codebase](https://img.shields.io/badge/100%25-Agentic%20codebase-5a67d8.svg)](https://github.com/kennygeiler/GraphRAG)
