@@ -1,6 +1,6 @@
 # Project Memory: ScriptRAG
 
-**Authoritative context:** See **`strategy.md`** in the repo root for full project state, roadmap, metric definitions, app map, and strict AI rules. **Efficiency phase / `telemetry_version` log:** **`Telemetry.md`**. **Update `strategy.md` on every major milestone**; keep **`MEMORY.md`** in sync; this file stays a short mirror for Cursor.
+**Authoritative context:** See **`strategy.md`** in the repo root for full project state, roadmap, metric definitions, app map, and strict AI rules. **Efficiency:** Phase 1 **shipped** (Token Agent **v2**); Phase 2 routing next. Baseline **2026-04-03** in **`Telemetry.md`**. **Update `strategy.md` on every major milestone**; keep **`MEMORY.md`** in sync; this file stays a short mirror for Cursor.
 
 **Current date:** April 2026 
 **Owner:** Kenny Geiler 

@@ -178,8 +178,9 @@ Otherwise defer_human.
 # ---------------------------------------------------------------------------
 
 def _build_audit_user_msg(graph_json: dict[str, Any], raw_text: str) -> str:
+    """Compact JSON (Phase 1) — same cap, more graph fits without pretty-print whitespace."""
     payload = {"scene_text": raw_text, "extracted_graph": graph_json}
-    return json.dumps(payload, ensure_ascii=False, indent=2)[:100_000]
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))[:120_000]
 
 
 def audit_quote_fidelity(

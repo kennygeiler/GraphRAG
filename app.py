@@ -29,7 +29,7 @@ from cleanup_review import (
     warning_json_location,
     warning_verify_guidance,
 )
-from ingest import _scene_number_key, build_system_prompt, extract_scenes
+from ingest import _scene_number_key, build_system_prompt, compact_lexicon_for_prompt, extract_scenes
 from lexicon import build_master_lexicon
 from metrics import get_driver
 from neo4j_loader import load_entries, wipe_screenplay_graph_keep_pipeline_runs
@@ -666,8 +666,7 @@ The hallucinated-quote check substring-matches each `source_quote` against the s
                         lex_obj = json.loads(
                             (_PROJECT_ROOT / "master_lexicon.json").read_text(encoding="utf-8")
                         )
-                        lex_content = json.dumps(lex_obj, ensure_ascii=False, indent=2)
-                        system_prompt = build_system_prompt(lex_content)
+                        system_prompt = build_system_prompt(compact_lexicon_for_prompt(lex_obj))
                     except Exception as exc:
                         pipe_status.update(label="Lexicon failed", state="error")
                         st.error(f"Lexicon error: {exc}")

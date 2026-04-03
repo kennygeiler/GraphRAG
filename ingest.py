@@ -74,16 +74,35 @@ def format_scene_user_message(scene: dict[str, Any]) -> str:
     return f"--- Scene {num} ---\n{heading}\n{content}\n"
 
 
-def build_system_prompt(lexicon_content: str) -> str:
+def compact_lexicon_for_prompt(lexicon_obj: dict[str, Any]) -> str:
+    """Dense lexicon text for extraction system prompt (Phase 1 — fewer tokens than pretty JSON)."""
+    lines: list[str] = []
+    chars = lexicon_obj.get("characters")
+    if isinstance(chars, list):
+        for it in chars:
+            if isinstance(it, dict) and it.get("id"):
+                lines.append(f"Character id={it['id']!r} name={it.get('name', '')!r}")
+    locs = lexicon_obj.get("locations")
+    if isinstance(locs, list):
+        for it in locs:
+            if isinstance(it, dict) and it.get("id"):
+                lines.append(f"Location id={it['id']!r} name={it.get('name', '')!r}")
+    if lines:
+        return (
+            "Lexicon — use exact `id` and `name` for Character and Location nodes; props may use snake_case `id` from the script.\n"
+            + "\n".join(lines)
+        )
+    slim = json.dumps(lexicon_obj, ensure_ascii=False, separators=(",", ":"))
+    return slim[:40_000]
+
+
+def build_system_prompt(lexicon_block: str) -> str:
+    """*lexicon_block* should be from :func:`compact_lexicon_for_prompt` (or a short legacy blob)."""
     return (
         "You are a Narrative Graph Architect. Extract the Character, Location, and Prop nodes "
         "and their Relationships from the provided scene.\n\n"
-        f"CRITICAL: You may ONLY use names from this Lexicon: {lexicon_content}. "
-        "If a character or location appears in the text but is NOT in the Lexicon, you MUST ignore them.\n\n"
-        "The lexicon lists canonical characters and locations (each with `id` and `name`). "
-        "For Character and Location nodes, use those exact `id` and `name` values only. "
-        "For Prop nodes (plot-significant objects only), use snake_case `id` and a `name` taken from the script "
-        "when the lexicon does not list props.\n\n"
+        f"CRITICAL: You may ONLY use Character/Location entities from this lexicon:\n{lexicon_block}\n\n"
+        "If a character or location appears in the text but is NOT listed above, you MUST ignore them.\n\n"
         "Do not emit Event nodes; output only Character, Location, and Prop in `nodes`.\n\n"
         "Every relationship MUST include a source_quote which is the exact, verbatim text from the script "
         "that proves the relationship."
@@ -348,7 +367,6 @@ def main() -> None:
         sys.exit(1)
 
     lexicon_obj = json.loads(args.lexicon.read_text(encoding="utf-8"))
-    lexicon_content = json.dumps(lexicon_obj, ensure_ascii=False, indent=2)
     lexicon_ids: set[str] = set()
     if isinstance(lexicon_obj, dict):
         for entry in lexicon_obj.get("characters", []):
@@ -364,7 +382,7 @@ def main() -> None:
         sys.exit(1)
 
     total = len(scenes)
-    system_prompt = build_system_prompt(lexicon_content)
+    system_prompt = build_system_prompt(compact_lexicon_for_prompt(lexicon_obj))
 
     expected_nums = {_scene_number_key(s, j + 1) for j, s in enumerate(scenes)}
 

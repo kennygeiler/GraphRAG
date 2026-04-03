@@ -16,9 +16,9 @@ _DEFAULT_INPUT = 3.00
 _DEFAULT_OUTPUT = 15.00
 
 # Stored on each Neo4j :PipelineRun as ``telemetry_version``. **0** = legacy (missing property).
-# **1** = efficiency Phase 0 (per-stage extract/fix/audit attribution). Increment when stored
-# telemetry shape or attribution meaningfully changes; document in **Telemetry.md**.
-PIPELINE_TELEMETRY_VERSION = 1
+# **1** = Phase 0 (per-stage attribution). **2** = Phase 1 (prompt/payload shrink — compact lexicon + compact audit/fix JSON, audit max_tokens).
+# Increment when stored telemetry shape or attribution meaningfully changes; document in **Telemetry.md**.
+PIPELINE_TELEMETRY_VERSION = 2
 
 
 def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:

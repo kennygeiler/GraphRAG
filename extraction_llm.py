@@ -21,6 +21,8 @@ from schema import SceneGraph
 PRIMARY_MODEL = "claude-sonnet-4-6"
 FALLBACK_MODEL = "claude-3-haiku-20240307"
 _MAX_TOKENS = 4096
+# Auditors return small structured lists; cap output to save cost (Phase 1).
+_AUDIT_MAX_TOKENS = 2048
 
 _anthropic_raw: Anthropic | None = None
 _instructor_client: Any | None = None
@@ -60,13 +62,15 @@ def call_llm_with_usage(
     *,
     system_prompt: str,
     response_model: type[BaseModel] = SceneGraph,
+    max_tokens: int | None = None,
 ) -> tuple[BaseModel, dict[str, Any]]:
     """Structured-output completion returning ``(parsed_model, usage_dict)``."""
     client = _get_anthropic_client()
+    mt = _MAX_TOKENS if max_tokens is None else int(max_tokens)
     try:
         result, completion = client.messages.create_with_completion(
             model=model,
-            max_tokens=_MAX_TOKENS,
+            max_tokens=mt,
             temperature=0,
             system=system_prompt,
             messages=[{"role": "user", "content": prompt}],
@@ -117,12 +121,14 @@ def call_audit_llm_with_usage(
             PRIMARY_MODEL, user_text,
             system_prompt=system_prompt,
             response_model=response_model,
+            max_tokens=_AUDIT_MAX_TOKENS,
         )
     except (APIStatusError, Exception):
         return call_llm_with_usage(
             FALLBACK_MODEL, user_text,
             system_prompt=system_prompt,
             response_model=response_model,
+            max_tokens=_AUDIT_MAX_TOKENS,
         )
 
 
@@ -135,10 +141,11 @@ def _build_fix_system_prompt(original_system: str) -> str:
         "- Fix the specific validation error below. For duplicate LOCATED_IN: keep exactly one LOCATED_IN per "
         "character source (choose the best-supported location by source_quote); remove redundant LOCATED_IN edges.\n"
         "- Preserve all other valid edges and nodes where possible.\n"
-        f"\nOriginal extraction instructions (for context):\n{original_system[:12000]}"
+        f"\nOriginal extraction instructions (for context):\n{original_system[:8000]}"
     )
 
 
 def _build_fix_user_msg(bad_graph: dict[str, Any], error: str, user_text: str) -> str:
     payload = {"validation_error": error, "bad_graph": bad_graph, "scene_text": user_text}
-    return "Fix this graph.\n\n" + json.dumps(payload, ensure_ascii=False, indent=2)[:100000]
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    return "Fix this graph.\n\n" + body[:120_000]
