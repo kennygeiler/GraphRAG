@@ -31,7 +31,6 @@ def save_pipeline_run(
     warnings_count: int,
     telemetry_tokens: int,
     telemetry_cost_usd: float,
-    agent_optimization_version: int,
     failed_scenes: int,
     llm_auditors_enabled: bool,
     fdx_filename: str = "",
@@ -57,7 +56,6 @@ def save_pipeline_run(
                 warnings_count: toInteger($warnings_count),
                 telemetry_tokens: toInteger($telemetry_tokens),
                 telemetry_cost_usd: $telemetry_cost_usd,
-                agent_optimization_version: toInteger($agent_opt),
                 failed_scenes: toInteger($failed_scenes),
                 llm_auditors_enabled: $auditors
             })
@@ -71,7 +69,6 @@ def save_pipeline_run(
             warnings_count=warnings_count,
             telemetry_tokens=telemetry_tokens,
             telemetry_cost_usd=float(telemetry_cost_usd),
-            agent_opt=agent_optimization_version,
             failed_scenes=failed_scenes,
             auditors=bool(llm_auditors_enabled),
         )

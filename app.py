@@ -56,8 +56,6 @@ _log = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _TARGET_FDX = _PROJECT_ROOT / "target_script.fdx"
-# Bump when you ship pipeline/agent optimizations (tracked in efficiency tab).
-AGENT_OPTIMIZATION_VERSION = 0
 # Pipeline "Smoke test" mode: first N scenes in screenplay order (reproducible quick run).
 PIPELINE_SMOKE_FIRST_SCENES = 5
 
@@ -102,7 +100,6 @@ def _persist_pipeline_run(
             warnings_count=warnings_count,
             telemetry_tokens=telemetry_tokens,
             telemetry_cost_usd=telemetry_cost_usd,
-            agent_optimization_version=AGENT_OPTIMIZATION_VERSION,
             failed_scenes=failed_scenes,
             llm_auditors_enabled=llm_auditors_enabled,
             fdx_filename=fdx_filename,
@@ -385,24 +382,19 @@ with st.sidebar:
             f"**Demo layout** (`SCRIPTRAG_DEMO_LAYOUT=1`): **{_VERIFY_TAB_LABEL} → Data out** before **Reconcile** "
             "— for pipeline storytelling."
         )
-    with st.expander("When to reset or reload", expanded=False):
+
+    with st.expander("Cache vs clear — quick guide", expanded=False):
         st.markdown(
-            "**Reload Neo4j cache** — Click when **Data out** or **Reconcile** still show **old** label or "
-            "relationship counts after you **Approve & load**, run a **merge**, or change the graph in **Neo4j Browser** "
-            "(or another tool). This only clears **Streamlit’s cached queries** and reloads fresh reads from Neo4j — "
-            "it does **not** delete graph data."
+            "- **Reload Neo4j cache** — Refreshes Streamlit’s cached Neo4j reads (e.g. after **Approve & load**, "
+            "**Reconcile** merges, or edits in Neo4j Browser). Does **not** delete data.\n"
+            "- **Clear screenplay & pipeline files** — Removes the screenplay graph in Neo4j and deletes local pipeline "
+            r"JSON (`raw_scenes.json`, `master_lexicon.json`, `validated_graph.json`, `pipeline_state.json`). "
+            "Clears Pipeline / Verify session state. Use when **switching scripts** or you need disk and DB aligned. "
+            "**Pipeline Efficiency Tracking** history is **not** removed.\n"
+            f"- **Typical flow:** upload `.fdx` → run **Pipeline** → **{_VERIFY_TAB_LABEL}** → **Approve & load** → "
+            "**Reload Neo4j cache** only if a tab still looks stale."
         )
-        st.markdown(
-            "**Reset graph & pipeline files** — Click when you are **switching screenplays**, a **major new draft**, "
-            "or you want a **clean slate**: it removes the screenplay from **Neo4j**, deletes on-disk pipeline JSON "
-            r"(`raw_scenes.json`, `master_lexicon.json`, `validated_graph.json`, `pipeline_state.json`), and clears "
-            "in-session pipeline / verify state so nothing mixes with the previous script. **:PipelineRun** efficiency "
-            "history is **kept**."
-        )
-        st.markdown(
-            f"**Typical new script:** upload **.fdx** → (optional) **Reset** for a clean slate → **Run Pipeline** → "
-            f"**{_VERIFY_TAB_LABEL}** → **Approve & load** → use **Reload cache** only if tables still look stale."
-        )
+
     if st.button(
         "Reload Neo4j cache",
         help=(
@@ -410,31 +402,41 @@ with st.sidebar:
             "Use after Approve & load, merges, or edits outside the app if counts look stale. Does not wipe Neo4j."
         ),
         key="sidebar_reload",
+        use_container_width=True,
     ):
         st.cache_data.clear()
         st.session_state["_flash"] = "Cache cleared — re-querying Neo4j."
         st.rerun()
 
-    with st.expander("Reset graph data", expanded=False):
-        st.caption(
-            "Clears the **screenplay graph** in Neo4j and removes pipeline JSON on disk — use when **changing scripts** "
-            "or you need disk + DB aligned to one project. **:PipelineRun** rows are kept — **Pipeline Efficiency Tracking** history stays."
-        )
-        if st.button("Clear graph & pipeline files", key="sidebar_nuke"):
-            try:
-                _wipe_dashboard_neo4j_keep_pipeline_runs()
-                _delete_pipeline_json_files()
-            except Exception as exc:
-                st.error(f"Reset failed: {exc}")
-            else:
-                st.session_state.pop("pipeline_results", None)
-                st.session_state.pop("verify_hitl_neo4j_load_at", None)
-                st.session_state.pop("verify_hitl_load_audit_payload", None)
-                st.cache_data.clear()
-                st.session_state["_flash"] = (
-                    "Neo4j screenplay graph cleared (PipelineRun history kept); pipeline JSON removed."
-                )
-                st.rerun()
+    st.divider()
+    st.markdown("**Clear screenplay**")
+    st.caption(
+        "Neo4j screenplay graph + local pipeline JSON. Keeps **Pipeline Efficiency Tracking** history."
+    )
+    if st.button(
+        "Clear screenplay & pipeline files",
+        help=(
+            "Wipes screenplay data in Neo4j (efficiency run rows stay) and deletes pipeline JSON on disk. "
+            "Resets Pipeline / Verify state in this session."
+        ),
+        key="sidebar_nuke",
+        type="secondary",
+        use_container_width=True,
+    ):
+        try:
+            _wipe_dashboard_neo4j_keep_pipeline_runs()
+            _delete_pipeline_json_files()
+        except Exception as exc:
+            st.error(f"Clear failed: {exc}")
+        else:
+            st.session_state.pop("pipeline_results", None)
+            st.session_state.pop("verify_hitl_neo4j_load_at", None)
+            st.session_state.pop("verify_hitl_load_audit_payload", None)
+            st.cache_data.clear()
+            st.session_state["_flash"] = (
+                "Screenplay cleared in Neo4j; pipeline JSON removed. Efficiency history unchanged."
+            )
+            st.rerun()
 
 # --------------- section navigation ---------------------------------
 # st.tabs() resets the visible tab on every rerun; a keyed radio keeps the user
@@ -1501,8 +1503,7 @@ if _active == "Pipeline Efficiency Tracking":
     st.caption(
         "**Agentic pipeline observability:** each finished run is a **:PipelineRun** row in Neo4j (survives screenplay reloads). "
         "Use it like production extractor metrics — **tokens**, **estimated cost**, correction/warning counts, scenes processed. "
-        "**Script Name** is the uploaded screenplay’s original filename when you used the Pipeline uploader, otherwise the on-disk pipeline target (**target_script.fdx**). "
-        f"Bump **`AGENT_OPTIMIZATION_VERSION`** in `app.py` when you ship pipeline improvements (current: **{AGENT_OPTIMIZATION_VERSION}**)."
+        "**Script Name** is the uploaded screenplay’s original filename when you used the Pipeline uploader, otherwise the on-disk pipeline target (**target_script.fdx**)."
     )
     try:
         _drv_eff = get_driver()
@@ -1536,7 +1537,6 @@ if _active == "Pipeline Efficiency Tracking":
                 "Warnings": int(r.get("warnings_count", 0) or 0),
                 "Telemetry tokens": tel_tok,
                 "Telemetry cost ($)": round(tel_cost, 4),
-                "Agent opt. ver.": int(r.get("agent_optimization_version", 0) or 0),
                 "Failed scenes": int(r.get("failed_scenes", 0) or 0),
             })
         df = pd.DataFrame(display)
